@@ -6,7 +6,7 @@ Part of the Worlds durable-backend family alongside [`@worlds/libsql`](https://g
 
 ## Status
 
-Scaffold. Implementation is tracked in [worlds-sdk-ts#136](https://github.com/wazootech/worlds-sdk-ts/issues/136) — the phased plan (D1 hexastore schema, `D1RdfjsStore`, import/export, Vectorize + Workers AI integrations) lives there.
+Scaffold only — **parked (post-beta)** as of 2026-08-17 per the provider-seam decision ([worlds-sdk-ts#164](https://github.com/wazootech/worlds-sdk-ts/issues/164)): the beta runs single-backend on Turso (`@worlds/libsql`). The phased plan (D1 hexastore schema, `D1RdfjsStore`, import/export, Vectorize + Workers AI integrations) is tracked in [worlds-sdk-ts#136](https://github.com/wazootech/worlds-sdk-ts/issues/136) (`backlog`) — re-open when the beta ships.
 
 ## Planned exports
 
