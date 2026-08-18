@@ -12,7 +12,7 @@ Scaffold only — **parked (post-beta)** as of 2026-08-17 per the provider-seam 
 
 | Export | Role |
 |--------|------|
-| `.` | Root barrel: `createCloudflareClient`, `createD1Client` |
+| `.` | Root barrel: `createCloudflareSdk`, `createD1Sdk` |
 | `./d1` | `D1QuadStore`, `D1RdfjsStore`, `D1SearchIndex`, types |
 | `./vectorize` | `CloudflareVectorSearchIndex`, RRF utilities |
 | `./workers-ai` | `WorkersAiEmbeddingService` |
