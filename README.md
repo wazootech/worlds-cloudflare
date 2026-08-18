@@ -1,6 +1,6 @@
 # @worlds/cloudflare
 
-Durable backend for the Worlds client ([`@worlds/client`](https://github.com/wazootech/worlds-client-ts)) targeting Cloudflare-native deployments: **D1** first, with optional **Vectorize** (semantic search) and **Workers AI** (embeddings) integrations.
+Durable backend for the Worlds client ([`@worlds/sdk`](https://jsr.io/@worlds/sdk)) targeting Cloudflare-native deployments: **D1** first, with optional **Vectorize** (semantic search) and **Workers AI** (embeddings) integrations.
 
 Part of the Worlds durable-backend family alongside [`@worlds/libsql`](https://github.com/wazootech/worlds-libsql) and [`@worlds/postgres`](https://github.com/wazootech/worlds-postgres), per the provider-seam design ([worlds-sdk-ts#164](https://github.com/wazootech/worlds-sdk-ts/issues/164)).
 
