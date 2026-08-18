@@ -7,13 +7,15 @@ deployments: **D1** first, with optional **Vectorize** (semantic search) and
 
 Part of the Worlds durable-backend family alongside
 [`@worlds/libsql`](https://github.com/wazootech/worlds-libsql) and
-[`@worlds/postgres`](https://github.com/wazootech/worlds-postgres), per the
-provider-seam design
-([worlds-sdk-ts#164](https://github.com/wazootech/worlds-sdk-ts/issues/164)).
+[`@worlds/postgres`](https://github.com/wazootech/worlds-postgres). The
+provider-strategy vocabulary is backend-internal (per the de-escalated seam
+decision,
+[worlds-sdk-ts#170](https://github.com/wazootech/worlds-sdk-ts/issues/170));
+cross-backend interchangeability lives at the `@worlds/sdk` `Sdk` seam.
 
 ## Status
 
-Scaffold only — **parked (post-beta)** as of 2026-08-17 per the provider-seam
+Scaffold only — **parked (post-beta)** as of 2026-08-17 per the beta practice
 decision
 ([worlds-sdk-ts#164](https://github.com/wazootech/worlds-sdk-ts/issues/164)):
 the beta runs single-backend on Turso (`@worlds/libsql`). The phased plan (D1
