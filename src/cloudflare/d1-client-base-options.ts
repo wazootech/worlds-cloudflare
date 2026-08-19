@@ -17,7 +17,7 @@ export interface D1ClientBaseOptions extends QuadFilter {
   maxLookupChunkSize?: number;
 
   /**
-   * vectorDimensions pins F32_BLOB width for chunk vectors and must match every embedding produced when embeddingService is set (default 32).
+   * vectorDimensions pins F32_BLOB width for chunk vectors and must match every embedding produced when embeddingService is set (default 1536).
    */
   vectorDimensions?: number;
 

@@ -33,7 +33,7 @@ export interface CloudflareSdkOptions extends D1ClientBaseOptions {
 export async function createCloudflareSdk(
   options: CloudflareSdkOptions,
 ): Promise<SdkInterface> {
-  const vectorDimensions = options.vectorDimensions ?? 32;
+  const vectorDimensions = options.vectorDimensions ?? 1536;
   const connection = new D1ConnectionDriver(options.database);
   const schema = new D1SchemaBuilder(vectorDimensions);
   const searchQuery = new D1SearchQueryBuilder(vectorDimensions);
