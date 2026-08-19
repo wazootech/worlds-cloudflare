@@ -9,7 +9,10 @@ import type { D1ClientBaseOptions } from "@/cloudflare/d1-client-base-options.ts
 import type { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
 import type { D1SearchQueryBuilder } from "./d1-search-query-builder.ts";
 import { buildChunkFtsValue } from "./search-chunk-fts.ts";
-import { D1BatchExecutor } from "@/cloudflare/d1/d1-batch-executor.ts";
+import {
+  D1BatchExecutor,
+  DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
+} from "@/cloudflare/d1/d1-batch-executor.ts";
 import type { D1Statement } from "@/cloudflare/d1/d1-connection-driver.ts";
 
 export interface ProjectSearchChunksOptions extends D1ClientBaseOptions {
@@ -37,7 +40,8 @@ export async function projectSearchChunks(
   );
 
   if (chunkStatements.length > 0) {
-    const writeBatchSize = options.maxWriteBatchSize ?? 500;
+    const writeBatchSize = options.maxWriteBatchSize ??
+      DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
     try {
       const executor = new D1BatchExecutor({
         connection: options.connection,
@@ -64,7 +68,8 @@ export async function refreshSearchChunksForQuads(
   }
 
   const lookupChunkSize = options.maxLookupChunkSize ?? 100;
-  const writeBatchSize = options.maxWriteBatchSize ?? 500;
+  const writeBatchSize = options.maxWriteBatchSize ??
+    DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
 
   const quadIds = await hashQuads(quads);
   const chunkInsertStatements = await buildChunkStatements(
