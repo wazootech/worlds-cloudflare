@@ -16,7 +16,7 @@ import {
 import { D1BatchExecutor } from "@/cloudflare/d1/d1-batch-executor.ts";
 import { DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE } from "@/cloudflare/d1/d1-batch-executor.ts";
 import { DEFAULT_D1_MAX_WRITE_BATCH_SIZE } from "@/cloudflare/d1/d1-batch-executor.ts";
-import { quadFromD1Row } from "@/cloudflare/d1/d1-quad-row.ts";
+import { quadFromD1Row, quadToInsertRow } from "@/cloudflare/d1/d1-quad-row.ts";
 import { D1SchemaBuilder } from "@/cloudflare/schema/d1-schema-builder.ts";
 import { D1QuadStream } from "./d1-quad-stream.ts";
 
@@ -456,30 +456,6 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
   public get size(): number {
     return this.liveCount;
   }
-}
-
-/** quadToInsertRow flattens a quad into a D1 insert row with a content-addressed id. */
-async function quadToInsertRow(quad: rdfjs.Quad): Promise<InsertQuadRow> {
-  const [id] = await hashQuads([quad]);
-  const subject = quad.subject;
-  const object = quad.object;
-  const graph = quad.graph;
-  return {
-    quad_id: id,
-    s: subject.value,
-    s_type: subject.termType,
-    p: quad.predicate.value,
-    o: object.value,
-    o_type: object.termType,
-    o_datatype: object.termType === "Literal"
-      ? (object as rdfjs.Literal).datatype?.value ?? null
-      : null,
-    o_lang: object.termType === "Literal"
-      ? (object as rdfjs.Literal).language || null
-      : null,
-    g: graph.value,
-    g_type: graph.termType,
-  };
 }
 
 /** stageChunked slices ids into chunks and stages the generated statements per chunk. */

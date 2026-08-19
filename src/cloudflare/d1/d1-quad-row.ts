@@ -1,6 +1,8 @@
 import type * as rdfjs from "@rdfjs/types";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import { toRdfjsTerm } from "@worlds/sdk/quad-store";
+import { hashQuads } from "@worlds/sdk/quad-store";
+import type { InsertQuadRow } from "@/cloudflare/quad-store/d1-quad-query-builder.ts";
 
 const { quad } = DataFactory;
 
@@ -30,4 +32,30 @@ export function quadFromD1Row(row: Record<string, unknown>): rdfjs.Quad {
   }) as rdfjs.Quad_Graph;
 
   return quad(subject, predicate, object, graph);
+}
+
+/** quadToInsertRow flattens a quad into a D1 insert row with a content-addressed id. */
+export async function quadToInsertRow(
+  quad: rdfjs.Quad,
+): Promise<InsertQuadRow> {
+  const [id] = await hashQuads([quad]);
+  const subject = quad.subject;
+  const object = quad.object;
+  const graph = quad.graph;
+  return {
+    quad_id: id,
+    s: subject.value,
+    s_type: subject.termType,
+    p: quad.predicate.value,
+    o: object.value,
+    o_type: object.termType,
+    o_datatype: object.termType === "Literal"
+      ? (object as rdfjs.Literal).datatype?.value ?? null
+      : null,
+    o_lang: object.termType === "Literal"
+      ? (object as rdfjs.Literal).language || null
+      : null,
+    g: graph.value,
+    g_type: graph.termType,
+  };
 }
