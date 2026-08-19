@@ -15,14 +15,15 @@ cross-backend interchangeability lives at the `@worlds/sdk` `Sdk` seam.
 
 ## Status
 
-Active development. The D1 quad store layer
-([`D1RdfjsStore`](#planned-exports) + `D1SchemaBuilder` + miniflare substrate)
-and the keyword search index (`CloudflareSearchIndex`, FTS5) are implemented and
-tested against miniflare. Vectorize (semantic search) and Workers AI
-(embeddings) integrations remain planned. The phased plan is tracked in
-[worlds-sdk-ts#136](https://github.com/wazootech/worlds-sdk-ts/issues/136).
+Active development. The D1 quad store layer ([`D1RdfjsStore`](#exports) +
+`D1SchemaBuilder` + miniflare substrate), the keyword search index
+(`CloudflareSearchIndex`, FTS5), the SDK factory (`createCloudflareSdk`), and
+the shared parity suite (against `@worlds/sdk/memory`'s `createMemorySdk`) are
+implemented and tested. Vectorize (semantic search) and Workers AI (embeddings)
+integrations remain planned. The phased plan is tracked in
+[worlds-cloudflare#7](https://github.com/wazootech/worlds-cloudflare/issues/7).
 
-## Planned exports
+## Exports
 
 | Export           | Role                                                                      |
 | ---------------- | ------------------------------------------------------------------------- |
