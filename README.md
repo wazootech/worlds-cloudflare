@@ -15,23 +15,24 @@ cross-backend interchangeability lives at the `@worlds/sdk` `Sdk` seam.
 
 ## Status
 
-Scaffold only — **parked (post-beta)** as of 2026-08-17 per the beta practice
-decision
-([worlds-sdk-ts#164](https://github.com/wazootech/worlds-sdk-ts/issues/164)):
-the beta runs single-backend on Turso (`@worlds/libsql`). The phased plan (D1
-hexastore schema, `D1RdfjsStore`, import/export, Vectorize + Workers AI
-integrations) is tracked in
-[worlds-sdk-ts#136](https://github.com/wazootech/worlds-sdk-ts/issues/136)
-(`backlog`) — re-open when the beta ships.
+Active development. The D1 quad store layer
+([`D1RdfjsStore`](#planned-exports) + `D1SchemaBuilder` + miniflare substrate)
+and the keyword search index (`CloudflareSearchIndex`, FTS5) are implemented and
+tested against miniflare. Vectorize (semantic search) and Workers AI
+(embeddings) integrations remain planned. The phased plan is tracked in
+[worlds-sdk-ts#136](https://github.com/wazootech/worlds-sdk-ts/issues/136).
 
 ## Planned exports
 
-| Export         | Role                                                  |
-| -------------- | ----------------------------------------------------- |
-| `.`            | Root barrel: `createCloudflareSdk`, `createD1Sdk`     |
-| `./d1`         | `D1QuadStore`, `D1RdfjsStore`, `D1SearchIndex`, types |
-| `./vectorize`  | `CloudflareVectorSearchIndex`, RRF utilities          |
-| `./workers-ai` | `WorkersAiEmbeddingService`                           |
+| Export           | Role                                                                      |
+| ---------------- | ------------------------------------------------------------------------- |
+| `.`              | Root barrel: `createCloudflareSdk`, `D1RdfjsStore`, `D1QuadStore`         |
+| `./quad-store`   | `D1QuadStore` (import/export/transaction over D1), `D1SearchQueryBuilder` |
+| `./search-index` | `CloudflareSearchIndex` (FTS5 keyword search), `D1SearchIndexProjector`   |
+| `./rdfjs-store`  | `D1RdfjsStore` (RDF/JS Store over D1), `D1QuadStream`                     |
+| `./schema`       | `D1SchemaBuilder` (idempotent D1 DDL: quads, chunks, FTS5 + triggers)     |
+| `./vectorize`    | `CloudflareVectorSearchIndex`, RRF utilities (planned)                    |
+| `./workers-ai`   | `WorkersAiEmbeddingService` (planned)                                     |
 
 ## Setup
 
