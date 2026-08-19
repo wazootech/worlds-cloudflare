@@ -4,8 +4,8 @@ import type { D1Statement } from "@/cloudflare/d1/d1-connection-driver.ts";
 /** DEFAULT_MAX_LOOKUP_CHUNK_SIZE is the default IN-clause and deletion chunk width (100 params/statement cap). */
 export const DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE = 100;
 
-/** DEFAULT_D1_MAX_WRITE_BATCH_SIZE limits statements per D1 batch() call. */
-export const DEFAULT_D1_MAX_WRITE_BATCH_SIZE = 500;
+/** DEFAULT_D1_MAX_WRITE_BATCH_SIZE limits statements per D1 batch() call (100 = the D1 batch cap). */
+export const DEFAULT_D1_MAX_WRITE_BATCH_SIZE = 100;
 
 /** STAGING_FLUSH_THRESHOLD flushes staged SQL during large commits to avoid huge in-memory arrays. */
 export const STAGING_FLUSH_THRESHOLD = 10_000;
@@ -45,16 +45,21 @@ export class D1BatchExecutor {
 
   /**
    * flush executes and clears all currently staged write statements.
+   * D1's atomic unit is a single batch() call capped at 100 statements, so
+   * staged statements are chunked by writeBatchSize and executed sequentially.
    */
   public async flush(): Promise<void> {
     if (this.statements.length === 0) {
       return;
     }
 
-    const { connection } = this.options;
+    const { connection, writeBatchSize } = this.options;
+    const staged = this.statements.splice(0, this.statements.length);
 
     try {
-      await connection.batch(this.statements);
+      for (let index = 0; index < staged.length; index += writeBatchSize) {
+        await connection.batch(staged.slice(index, index + writeBatchSize));
+      }
     } finally {
       this.statements.length = 0;
     }

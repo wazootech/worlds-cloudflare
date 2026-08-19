@@ -26,7 +26,7 @@ export interface D1ClientBaseOptions extends QuadFilter {
    */
   matchPageSize?: number;
 
-  /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 500. */
+  /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 100 (D1's batch cap). */
   maxWriteBatchSize?: number;
 
   /**

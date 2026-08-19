@@ -4,7 +4,10 @@ import { isReplaceImportCommit } from "@worlds/sdk/quad-store";
 import { filterQuads, hashQuads } from "@worlds/sdk/quad-store";
 import type { D1ClientBaseOptions } from "@/cloudflare/d1-client-base-options.ts";
 import type { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
-import { D1BatchExecutor } from "@/cloudflare/d1/d1-batch-executor.ts";
+import {
+  D1BatchExecutor,
+  DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
+} from "@/cloudflare/d1/d1-batch-executor.ts";
 import {
   buildBulkInsertQuads,
   buildDeleteQuadsByQuadIds,
@@ -18,7 +21,7 @@ export interface CommitPatchToD1Options extends D1ClientBaseOptions {
   /** connection is the D1ConnectionDriver wrapping the D1 binding. */
   connection: D1ConnectionDriver;
 
-  /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 500. */
+  /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 100 (D1's batch cap). */
   maxWriteBatchSize?: number;
 }
 
@@ -56,7 +59,7 @@ export async function commitPatchToD1(
     exclude,
   } = options;
   const lookupChunkSize = maxLookupChunkSize ?? 100;
-  const writeBatchSize = maxWriteBatchSize ?? 500;
+  const writeBatchSize = maxWriteBatchSize ?? DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
 
   const batchExecutor = new D1BatchExecutor({ connection, writeBatchSize });
 

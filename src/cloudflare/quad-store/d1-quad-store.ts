@@ -18,7 +18,10 @@ import type {
   D1SearchIndexProjector,
   D1SearchQueryBuilder,
 } from "@/cloudflare/search-index/mod.ts";
-import { D1BatchExecutor } from "@/cloudflare/d1/d1-batch-executor.ts";
+import {
+  D1BatchExecutor,
+  DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
+} from "@/cloudflare/d1/d1-batch-executor.ts";
 
 /**
  * D1QuadStoreOptions defines the configurations for the D1QuadStore.
@@ -123,7 +126,8 @@ async function stageChunkedDeletions(
   const lookupChunkSize = options.maxLookupChunkSize ?? 100;
   const batchExecutor = new D1BatchExecutor({
     connection: options.connection,
-    writeBatchSize: options.maxWriteBatchSize ?? 500,
+    writeBatchSize: options.maxWriteBatchSize ??
+      DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
   });
   for (let index = 0; index < quadIds.length; index += lookupChunkSize) {
     const chunk = quadIds.slice(index, index + lookupChunkSize);
