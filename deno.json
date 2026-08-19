@@ -4,6 +4,9 @@
   "description": "Cloudflare D1 durable backend for the Worlds client — RDF/JS quad primitive packaged with the worlds impl.",
   "license": "WTFPL",
   "nodeModulesDir": "auto",
+  "lock": {
+    "includePlatform": true
+  },
   "minimumDependencyAge": 0,
   "exports": {
     ".": "./src/mod.ts",
