@@ -65,7 +65,7 @@ Deno.test("CloudflareSearchIndex - keyword search matches indexed literal text",
         kind: "quads",
         quads: [
           createQuad(
-            namedNode("urn:alice"),
+            namedNode("urn:ethan"),
             namedNode("urn:knows"),
             literal("Ethan runs the workspace"),
           ),
@@ -75,7 +75,7 @@ Deno.test("CloudflareSearchIndex - keyword search matches indexed literal text",
 
     const response = await searchIndex.search({ query: "Ethan" });
     assertEquals(response.results?.length, 1);
-    assertEquals(response.results?.[0].subject, "urn:alice");
+    assertEquals(response.results?.[0].subject, "urn:ethan");
   } finally {
     await dispose();
   }
@@ -89,13 +89,13 @@ Deno.test("CloudflareSearchIndex - graph-scoped search excludes other graphs", a
         kind: "quads",
         quads: [
           createQuad(
-            namedNode("urn:alice"),
+            namedNode("urn:ethan"),
             namedNode("urn:knows"),
             literal("Gregory works here"),
             namedNode("urn:graphA"),
           ),
           createQuad(
-            namedNode("urn:bob"),
+            namedNode("urn:gregory"),
             namedNode("urn:knows"),
             literal("Gregory works there"),
             namedNode("urn:graphB"),
@@ -109,14 +109,14 @@ Deno.test("CloudflareSearchIndex - graph-scoped search excludes other graphs", a
       include: { graphs: ["urn:graphA"] },
     });
     assertEquals(scoped.results?.length, 1);
-    assertEquals(scoped.results?.[0].subject, "urn:alice");
+    assertEquals(scoped.results?.[0].subject, "urn:ethan");
 
     const excluded = await searchIndex.search({
       query: "Gregory",
       exclude: { graphs: ["urn:graphB"] },
     });
     assertEquals(excluded.results?.length, 1);
-    assertEquals(excluded.results?.[0].subject, "urn:alice");
+    assertEquals(excluded.results?.[0].subject, "urn:ethan");
   } finally {
     await dispose();
   }

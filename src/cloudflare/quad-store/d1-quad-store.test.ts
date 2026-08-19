@@ -158,9 +158,9 @@ Deno.test("D1QuadStore - createTransaction commits an atomic patch", async () =>
     const transaction = quadStore.createTransaction();
     transaction.add(
       createQuad(
-        namedNode("urn:alice"),
+        namedNode("urn:ethan"),
         namedNode("urn:knows"),
-        namedNode("urn:bob"),
+        namedNode("urn:gregory"),
         defaultGraph(),
       ),
     );
@@ -176,7 +176,7 @@ Deno.test("D1QuadStore - createTransaction commits an atomic patch", async () =>
 
     const quads = await store.getQuads();
     assertEquals(quads.length, 1);
-    assertEquals(quads[0].subject.value, "urn:alice");
+    assertEquals(quads[0].subject.value, "urn:ethan");
   } finally {
     await dispose();
   }

@@ -20,7 +20,7 @@ Deno.test("createCloudflareSdk - import/export round-trips quads", async () => {
       mode: "replace",
       source: {
         kind: "serialized",
-        data: "<urn:alice> <urn:knows> <urn:bob> .\n",
+        data: "<urn:ethan> <urn:knows> <urn:gregory> .\n",
         contentType: NQUADS,
       },
     });
@@ -32,7 +32,7 @@ Deno.test("createCloudflareSdk - import/export round-trips quads", async () => {
       throw new Error("export did not return serialized data");
     }
 
-    assertEquals(exported.data.includes("urn:alice"), true);
+    assertEquals(exported.data.includes("urn:ethan"), true);
   } finally {
     await dispose();
   }
@@ -44,14 +44,14 @@ Deno.test("createCloudflareSdk - SPARQL query resolves stored facts", async () =
     await sdk.import({
       source: {
         kind: "serialized",
-        data: '<urn:alice> <urn:name> "Alice" .\n',
+        data: '<urn:ethan> <urn:name> "Ethan" .\n',
         contentType: NQUADS,
       },
     });
 
     const response = await sdk.sparql({
       query: `PREFIX urn: <urn:>
-      SELECT ?s WHERE { ?s urn:name "Alice" }`,
+      SELECT ?s WHERE { ?s urn:name "Ethan" }`,
     });
     if (response.kind !== "select") {
       throw new Error("expected a SELECT response");
@@ -59,7 +59,7 @@ Deno.test("createCloudflareSdk - SPARQL query resolves stored facts", async () =
 
     const bindings = response.data.results.bindings;
     assertEquals(bindings.length, 1);
-    assertEquals(bindings[0].s.value, "urn:alice");
+    assertEquals(bindings[0].s.value, "urn:ethan");
   } finally {
     await dispose();
   }
@@ -72,14 +72,14 @@ Deno.test("createCloudflareSdk - keyword search over imported literals", async (
       source: {
         kind: "serialized",
         data:
-          '<urn:alice> <urn:knows> "Ethan writes robust retrieval infrastructure" .\n',
+          '<urn:ethan> <urn:knows> "Ethan writes robust retrieval infrastructure" .\n',
         contentType: NQUADS,
       },
     });
 
     const response = await sdk.search({ query: "Ethan" });
     assertEquals(response.results?.length, 1);
-    assertEquals(response.results?.[0].subject, "urn:alice");
+    assertEquals(response.results?.[0].subject, "urn:ethan");
   } finally {
     await dispose();
   }
@@ -90,7 +90,7 @@ Deno.test("createCloudflareSdk - SPARQL insert triggers search projection (defer
   try {
     await sdk.sparql({
       query: `PREFIX urn: <urn:>
-      INSERT DATA { urn:alice urn:knows "Gregory wrote the D1 layer" . }`,
+      INSERT DATA { urn:ethan urn:knows "Gregory wrote the D1 layer" . }`,
     });
 
     const response = await sdk.search({ query: "Gregory" });
