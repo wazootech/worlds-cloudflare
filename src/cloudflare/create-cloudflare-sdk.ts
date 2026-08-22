@@ -1,7 +1,7 @@
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import type * as rdfjs from "@rdfjs/types";
-import { Sdk } from "@worlds/sdk";
-import type { SdkInterface } from "@worlds/sdk";
+import { WorldsSdk } from "@worlds/sdk";
+import type { WorldsSdkInterface } from "@worlds/sdk";
 import { WazooSparqlEngine } from "@wazoo/sparql-engine";
 import {
   CloudflareSearchIndex,
@@ -16,23 +16,23 @@ import { D1SchemaBuilder } from "@/cloudflare/schema/d1-schema-builder.ts";
 import { D1SearchQueryBuilder } from "@/cloudflare/search-index/d1-search-query-builder.ts";
 
 /**
- * CloudflareSdkOptions configures Cloudflare D1 execution through D1RdfjsStore and quad indexes.
+ * CloudflareWorldsSdkOptions configures Cloudflare D1 execution through D1RdfjsStore and quad indexes.
  */
-export interface CloudflareSdkOptions extends D1ClientBaseOptions {
+export interface CloudflareWorldsSdkOptions extends D1ClientBaseOptions {
   /** database is the raw D1 binding (miniflare or a real Worker binding). */
   database: D1DatabaseLike;
 }
 
 /**
- * createCloudflareSdk synthesizes a Sdk for D1-backed quad indexes.
+ * createCloudflareWorldsSdk synthesizes a WorldsSdk for D1-backed quad indexes.
  *
  * The factory assembles the three strategy objects internally: a
  * D1ConnectionDriver over the raw D1 binding, a D1SchemaBuilder, and a
  * D1SearchQueryBuilder. Callers pass the plain D1 database binding.
  */
-export async function createCloudflareSdk(
-  options: CloudflareSdkOptions,
-): Promise<SdkInterface> {
+export async function createCloudflareWorldsSdk(
+  options: CloudflareWorldsSdkOptions,
+): Promise<WorldsSdkInterface> {
   const vectorDimensions = options.vectorDimensions ?? 1536;
   const connection = new D1ConnectionDriver(options.database);
   const schema = new D1SchemaBuilder(vectorDimensions);
@@ -78,7 +78,7 @@ export async function createCloudflareSdk(
     createTransaction: () => quadStore.createTransaction(),
   });
 
-  return new Sdk({
+  return new WorldsSdk({
     quadStore,
     searchIndex,
     sparqlEngine,

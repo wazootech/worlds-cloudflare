@@ -2,8 +2,8 @@
  * Parity suite for @worlds/cloudflare (workspace#59, #66, #72) — keeps the
  * D1 backend continuously validated against the shared in-memory reference.
  *
- * Runs the shared fixture corpus with reference = createMemorySdk (the
- * portable in-memory reference) and candidate = createCloudflareSdk over a
+ * Runs the shared fixture corpus with reference = createMemoryWorldsSdk (the
+ * portable in-memory reference) and candidate = createCloudflareWorldsSdk over a
  * miniflare D1 binding.
  *
  * Exemptions (explicit, documented on workspace#72 — never silent):
@@ -18,9 +18,9 @@
  * ranking vs scan order is an engine detail, not a parity contract.
  */
 import { assertEquals } from "@std/assert";
-import { createCloudflareSdk } from "@/cloudflare/mod.ts";
+import { createCloudflareWorldsSdk } from "@/cloudflare/mod.ts";
 import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
-import { createMemorySdk } from "@worlds/sdk/memory";
+import { createMemoryWorldsSdk } from "@worlds/sdk/memory";
 import { parityCorpus, runParitySuite } from "@worlds/sdk/testing";
 
 const CHUNKER_DIVERGENT_FIXTURE = "chunkBoundaryWorld";
@@ -30,7 +30,7 @@ const disposers: Array<() => Promise<void>> = [];
 async function createCloudflareSdkForParity() {
   const substrate = await createTestD1();
   disposers.push(substrate.dispose);
-  return createCloudflareSdk({ database: substrate.database });
+  return createCloudflareWorldsSdk({ database: substrate.database });
 }
 
 Deno.test(
@@ -43,7 +43,7 @@ Deno.test(
     let report;
     try {
       report = await runParitySuite({
-        reference: () => createMemorySdk(),
+        reference: () => createMemoryWorldsSdk(),
         candidate: () => createCloudflareSdkForParity(),
         fixtures,
         strictSearchOrder: false,

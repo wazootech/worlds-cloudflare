@@ -1,20 +1,20 @@
 import { assertEquals } from "@std/assert";
-import { createCloudflareSdk } from "./create-cloudflare-sdk.ts";
+import { createCloudflareWorldsSdk } from "./create-cloudflare-sdk.ts";
 import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
-import type { SdkInterface } from "@worlds/sdk";
+import type { WorldsSdkInterface } from "@worlds/sdk";
 
 const NQUADS = "application/n-quads";
 
-async function createTestSdk(): Promise<
-  { sdk: SdkInterface; dispose(): Promise<void> }
+async function createTestWorldsSdk(): Promise<
+  { sdk: WorldsSdkInterface; dispose(): Promise<void> }
 > {
   const substrate = await createTestD1();
-  const sdk = await createCloudflareSdk({ database: substrate.database });
+  const sdk = await createCloudflareWorldsSdk({ database: substrate.database });
   return { sdk, dispose: substrate.dispose };
 }
 
-Deno.test("createCloudflareSdk - import/export round-trips quads", async () => {
-  const { sdk, dispose } = await createTestSdk();
+Deno.test("createCloudflareWorldsSdk - import/export round-trips quads", async () => {
+  const { sdk, dispose } = await createTestWorldsSdk();
   try {
     await sdk.import({
       mode: "replace",
@@ -38,8 +38,8 @@ Deno.test("createCloudflareSdk - import/export round-trips quads", async () => {
   }
 });
 
-Deno.test("createCloudflareSdk - SPARQL query resolves stored facts", async () => {
-  const { sdk, dispose } = await createTestSdk();
+Deno.test("createCloudflareWorldsSdk - SPARQL query resolves stored facts", async () => {
+  const { sdk, dispose } = await createTestWorldsSdk();
   try {
     await sdk.import({
       source: {
@@ -65,8 +65,8 @@ Deno.test("createCloudflareSdk - SPARQL query resolves stored facts", async () =
   }
 });
 
-Deno.test("createCloudflareSdk - keyword search over imported literals", async () => {
-  const { sdk, dispose } = await createTestSdk();
+Deno.test("createCloudflareWorldsSdk - keyword search over imported literals", async () => {
+  const { sdk, dispose } = await createTestWorldsSdk();
   try {
     await sdk.import({
       source: {
@@ -85,8 +85,8 @@ Deno.test("createCloudflareSdk - keyword search over imported literals", async (
   }
 });
 
-Deno.test("createCloudflareSdk - SPARQL insert triggers search projection (deferred reindex)", async () => {
-  const { sdk, dispose } = await createTestSdk();
+Deno.test("createCloudflareWorldsSdk - SPARQL insert triggers search projection (deferred reindex)", async () => {
+  const { sdk, dispose } = await createTestWorldsSdk();
   try {
     await sdk.sparql({
       query: `PREFIX urn: <urn:>
@@ -100,15 +100,15 @@ Deno.test("createCloudflareSdk - SPARQL insert triggers search projection (defer
   }
 });
 
-Deno.test("createCloudflareSdk - invalid vectorDimensions throws", async () => {
+Deno.test("createCloudflareWorldsSdk - invalid vectorDimensions throws", async () => {
   const substrate = await createTestD1();
   try {
-    await createCloudflareSdk({
+    await createCloudflareWorldsSdk({
       database: substrate.database,
       vectorDimensions: 0,
     });
     throw new Error(
-      "expected createCloudflareSdk to reject vectorDimensions 0",
+      "expected createCloudflareWorldsSdk to reject vectorDimensions 0",
     );
   } catch (error) {
     const message = (error as Error).message;

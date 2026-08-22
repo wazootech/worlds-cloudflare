@@ -1,5 +1,5 @@
-export { createCloudflareSdk } from "./create-cloudflare-sdk.ts";
-export type { CloudflareSdkOptions } from "./create-cloudflare-sdk.ts";
+export { createCloudflareWorldsSdk } from "./create-cloudflare-sdk.ts";
+export type { CloudflareWorldsSdkOptions } from "./create-cloudflare-sdk.ts";
 export { D1RdfjsStore } from "./rdfjs-store/mod.ts";
 export type { D1RdfjsStoreOptions, D1Transaction } from "./rdfjs-store/mod.ts";
 export { D1SchemaBuilder } from "./schema/d1-schema-builder.ts";

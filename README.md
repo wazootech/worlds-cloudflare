@@ -11,14 +11,14 @@ Part of the Worlds durable-backend family alongside
 provider-strategy vocabulary is backend-internal (per the de-escalated seam
 decision,
 [worlds-sdk-ts#170](https://github.com/wazootech/worlds-sdk-ts/issues/170));
-cross-backend interchangeability lives at the `@worlds/sdk` `Sdk` seam.
+cross-backend interchangeability lives at the `@worlds/sdk` `WorldsSdk` seam.
 
 ## Status
 
 Active development. The D1 quad store layer ([`D1RdfjsStore`](#exports) +
 `D1SchemaBuilder` + miniflare substrate), the keyword search index
-(`CloudflareSearchIndex`, FTS5), the SDK factory (`createCloudflareSdk`), and
-the shared parity suite (against `@worlds/sdk/memory`'s `createMemorySdk`) are
+(`CloudflareSearchIndex`, FTS5), the SDK factory (`createCloudflareWorldsSdk`), and
+the shared parity suite (against `@worlds/sdk/memory`'s `createMemoryWorldsSdk`) are
 implemented and tested. Vectorize (semantic search) and Workers AI (embeddings)
 integrations remain planned. The phased plan is tracked in
 [worlds-cloudflare#7](https://github.com/wazootech/worlds-cloudflare/issues/7).
@@ -41,7 +41,7 @@ npx jsr add @worlds/cloudflare
 bundler needed.
 
 ```js
-import { createCloudflareSdk } from "https://esm.sh/jsr/@worlds/cloudflare@0.2.0";
+import { createCloudflareWorldsSdk } from "https://esm.sh/jsr/@worlds/cloudflare@0.2.0";
 ```
 
 With an import map:
@@ -55,21 +55,21 @@ With an import map:
 }
 </script>
 <script type="module">
-import { createCloudflareSdk } from "@worlds/cloudflare";
+import { createCloudflareWorldsSdk } from "@worlds/cloudflare";
 </script>
 ```
 
 Pin to an exact build for deterministic caching:
 
 ```js
-import { createCloudflareSdk } from "https://esm.sh/jsr/@worlds/cloudflare@0.2.0?pin=v1724100000";
+import { createCloudflareWorldsSdk } from "https://esm.sh/jsr/@worlds/cloudflare@0.2.0?pin=v1724100000";
 ```
 
 ## Exports
 
 | Export           | Role                                                                      |
 | ---------------- | ------------------------------------------------------------------------- |
-| `.`              | Root barrel: `createCloudflareSdk`, `D1RdfjsStore`, `D1QuadStore`         |
+| `.`              | Root barrel: `createCloudflareWorldsSdk`, `D1RdfjsStore`, `D1QuadStore`         |
 | `./quad-store`   | `D1QuadStore` (import/export/transaction over D1), `D1SearchQueryBuilder` |
 | `./search-index` | `CloudflareSearchIndex` (FTS5 keyword search), `D1SearchIndexProjector`   |
 | `./rdfjs-store`  | `D1RdfjsStore` (RDF/JS Store over D1), `D1QuadStream`                     |
