@@ -17,10 +17,11 @@ cross-backend interchangeability lives at the `@worlds/sdk` `WorldsSdk` seam.
 
 Active development. The D1 quad store layer ([`D1RdfjsStore`](#exports) +
 `D1SchemaBuilder` + miniflare substrate), the keyword search index
-(`CloudflareSearchIndex`, FTS5), the SDK factory (`createCloudflareWorldsSdk`), and
-the shared parity suite (against `@worlds/sdk/memory`'s `createMemoryWorldsSdk`) are
-implemented and tested. Vectorize (semantic search) and Workers AI (embeddings)
-integrations remain planned. The phased plan is tracked in
+(`CloudflareSearchIndex`, FTS5), the SDK factory (`createCloudflareWorldsSdk`),
+and the shared parity suite (against `@worlds/sdk/memory`'s
+`createMemoryWorldsSdk`) are implemented and tested. Vectorize (semantic search)
+and Workers AI (embeddings) integrations remain planned. The phased plan is
+tracked in
 [worlds-cloudflare#7](https://github.com/wazootech/worlds-cloudflare/issues/7).
 
 ## Install
@@ -69,7 +70,7 @@ import { createCloudflareWorldsSdk } from "https://esm.sh/jsr/@worlds/cloudflare
 
 | Export           | Role                                                                      |
 | ---------------- | ------------------------------------------------------------------------- |
-| `.`              | Root barrel: `createCloudflareWorldsSdk`, `D1RdfjsStore`, `D1QuadStore`         |
+| `.`              | Root barrel: `createCloudflareWorldsSdk`, `D1RdfjsStore`, `D1QuadStore`   |
 | `./quad-store`   | `D1QuadStore` (import/export/transaction over D1), `D1SearchQueryBuilder` |
 | `./search-index` | `CloudflareSearchIndex` (FTS5 keyword search), `D1SearchIndexProjector`   |
 | `./rdfjs-store`  | `D1RdfjsStore` (RDF/JS Store over D1), `D1QuadStream`                     |
