@@ -23,6 +23,48 @@ implemented and tested. Vectorize (semantic search) and Workers AI (embeddings)
 integrations remain planned. The phased plan is tracked in
 [worlds-cloudflare#7](https://github.com/wazootech/worlds-cloudflare/issues/7).
 
+## Install
+
+### Package managers
+
+```sh
+# Deno (first-class JSR support)
+deno add jsr:@worlds/cloudflare
+
+# Bun / npm / pnpm / Yarn (via JSR npm compatibility layer)
+npx jsr add @worlds/cloudflare
+```
+
+### CDN (browser / no build step)
+
+[esm.sh](https://esm.sh) serves JSR packages as ES modules — no install, no
+bundler needed.
+
+```js
+import { createCloudflareSdk } from "https://esm.sh/jsr/@worlds/cloudflare@0.2.0";
+```
+
+With an import map:
+
+```html
+<script type="importmap">
+{
+  "imports": {
+    "@worlds/cloudflare": "https://esm.sh/jsr/@worlds/cloudflare@0.2.0"
+  }
+}
+</script>
+<script type="module">
+import { createCloudflareSdk } from "@worlds/cloudflare";
+</script>
+```
+
+Pin to an exact build for deterministic caching:
+
+```js
+import { createCloudflareSdk } from "https://esm.sh/jsr/@worlds/cloudflare@0.2.0?pin=v1724100000";
+```
+
 ## Exports
 
 | Export           | Role                                                                      |
