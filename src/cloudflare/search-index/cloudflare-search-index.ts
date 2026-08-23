@@ -6,7 +6,7 @@ import type {
   SearchResponse,
   SearchResult,
 } from "@worlds/sdk/search-index";
-import { buildSearchResultId } from "./build-search-result-id.ts";
+import { buildSearchResultId } from "@worlds/sqlite/sql-core";
 import type { D1ClientBaseOptions } from "@/cloudflare/d1-client-base-options.ts";
 import type { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
 import type { D1SearchQueryBuilder } from "./d1-search-query-builder.ts";
