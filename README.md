@@ -28,9 +28,9 @@ This package consumes the shared, driver-free SQL plan layer from
 [`@worlds/sqlite/sql-core`](https://jsr.io/@worlds/sqlite) — the FTS5
 sanitizer/stopwords, `buildChunkFtsValue`, `buildSearchResultId`, the
 `chunks_fts` DDL/triggers emitters, filter-clause helpers, and the keyword
-branch plan. The D1-specific pieces stay local: the `chunks` table's
-`F32_BLOB` vector column reserved for Vectorize sync, the blob-bind chunk
-insert, and the empty-query fallback statement.
+branch plan. The D1-specific pieces stay local: the `chunks` table's `F32_BLOB`
+vector column reserved for Vectorize sync, the blob-bind chunk insert, and the
+empty-query fallback statement.
 
 ## Install
 

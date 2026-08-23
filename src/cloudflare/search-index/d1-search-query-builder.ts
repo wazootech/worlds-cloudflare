@@ -60,7 +60,7 @@ export class D1SearchQueryBuilder {
     value: string;
     fts_value: string;
     vector?: Float32Array | null;
-  }): { sql: string; args: (string | number | Uint8Array | null)[] } {
+  }): SqlStatement {
     const args: (string | number | Uint8Array | null)[] = [
       insertOptions.quad_id,
       insertOptions.subject,
@@ -84,7 +84,7 @@ export class D1SearchQueryBuilder {
 
   public buildDeleteByQuadIds(
     quadIds: string[],
-  ): { sql: string; args: string[] } {
+  ): SqlStatement {
     const placeholders = generatePlaceholders(quadIds.length);
     return {
       sql: `DELETE FROM chunks WHERE quad_id IN (${placeholders})`,

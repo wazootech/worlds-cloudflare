@@ -165,19 +165,14 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
    * shared sql-core emitters' multi-line DDL.
    */
   public async ensureSchema(): Promise<void> {
-    for (const ddl of this.schemaBuilder.buildTables()) {
-      await this.connection.execute({ sql: ddl });
-    }
-    for (const ddl of this.schemaBuilder.buildIndexes()) {
-      await this.connection.execute({ sql: ddl });
-    }
-    await this.connection.execute({
-      sql: this.schemaBuilder.buildD1ChunksQuadIdIndex(),
-    });
-    await this.connection.execute({
-      sql: this.schemaBuilder.buildD1ChunksFtsTable(),
-    });
-    for (const ddl of this.schemaBuilder.buildD1ChunksTriggers()) {
+    const statements = [
+      ...this.schemaBuilder.buildTables(),
+      ...this.schemaBuilder.buildIndexes(),
+      this.schemaBuilder.buildD1ChunksQuadIdIndex(),
+      this.schemaBuilder.buildD1ChunksFtsTable(),
+      ...this.schemaBuilder.buildD1ChunksTriggers(),
+    ];
+    for (const ddl of statements) {
       await this.connection.execute({ sql: ddl });
     }
     await this.refreshCount();

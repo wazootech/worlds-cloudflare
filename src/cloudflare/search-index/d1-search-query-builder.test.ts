@@ -72,7 +72,8 @@ Deno.test("buildInsertChunk - binds vector blob or null for future Vectorize syn
     fts_value: "v",
     vector: new Float32Array([1, 2]),
   });
-  assertEquals(withVector.args[6] instanceof Uint8Array, true);
+  assertEquals(withVector.args?.length, 7);
+  assertEquals(withVector.args?.[6] instanceof Uint8Array, true);
 
   const withoutVector = builder.buildInsertChunk({
     quad_id: "q1",
@@ -82,7 +83,7 @@ Deno.test("buildInsertChunk - binds vector blob or null for future Vectorize syn
     value: "v",
     fts_value: "v",
   });
-  assertEquals(withoutVector.args[6], null);
+  assertEquals(withoutVector.args?.[6], null);
 });
 
 Deno.test("buildDeleteByQuadIds - content-addressed deletion sweep", () => {
