@@ -8,7 +8,7 @@ import { chunkQuads } from "@worlds/sdk/search-index/quad-chunker";
 import type { D1ClientBaseOptions } from "@/cloudflare/d1-client-base-options.ts";
 import type { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
 import type { D1SearchQueryBuilder } from "./d1-search-query-builder.ts";
-import { buildChunkFtsValue } from "./search-chunk-fts.ts";
+import { buildChunkFtsValue } from "@worlds/sqlite/sql-core";
 import {
   D1BatchExecutor,
   DEFAULT_D1_MAX_WRITE_BATCH_SIZE,

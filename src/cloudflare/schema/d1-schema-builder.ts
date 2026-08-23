@@ -1,3 +1,9 @@
+import {
+  buildChunksFtsTable,
+  buildChunksQuadIdIndex,
+  buildChunksTriggers,
+} from "@worlds/sqlite/sql-core";
+
 /** Maximum embedding dimensions accepted by D1SchemaBuilder (Vectorize cap: 1536 float32). */
 const D1_MAX_VECTOR_DIMENSIONS = 1536;
 
@@ -63,17 +69,14 @@ export class D1SchemaBuilder {
   }
 
   public buildD1ChunksQuadIdIndex(): string {
-    return `CREATE INDEX IF NOT EXISTS idx_chunks_quad_id ON chunks (quad_id)`;
+    return buildChunksQuadIdIndex();
   }
 
   public buildD1ChunksFtsTable(): string {
-    return "CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(fts_value, content='chunks', content_rowid='id')";
+    return buildChunksFtsTable();
   }
 
   public buildD1ChunksTriggers(): string[] {
-    return [
-      "CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN INSERT INTO chunks_fts(rowid, fts_value) VALUES (new.id, new.fts_value); END;",
-      "CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN INSERT INTO chunks_fts(chunks_fts, rowid, fts_value) VALUES('delete', old.id, old.fts_value); END;",
-    ];
+    return buildChunksTriggers();
   }
 }

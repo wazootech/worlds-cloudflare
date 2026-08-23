@@ -78,6 +78,11 @@ export class D1ConnectionDriver {
 
   /**
    * exec runs a multi-statement DDL/migration string (no bound parameters).
+   *
+   * D1's script executor splits the input on newlines — each statement must
+   * therefore be single-line, and statements are separated by newlines. For
+   * individual statements with internal formatting (e.g. shared sql-core DDL),
+   * prefer execute() instead.
    */
   public async exec(sql: string): Promise<void> {
     await this.database.exec(sql);
