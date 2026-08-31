@@ -8,6 +8,8 @@
     "jsr:@worlds/sdk@0.6": "0.6.1",
     "jsr:@worlds/sdk@~0.6.1": "0.6.1",
     "jsr:@worlds/sqlite@0.6": "0.6.0",
+    "npm:@jsr/wazoo__sparql-engine@~0.4.1": "0.4.1",
+    "npm:@jsr/worlds__sdk@~0.6.1": "0.6.1_zod@4.4.3",
     "npm:@langchain/textsplitters@^1.0.1": "1.0.1_@langchain+core@1.2.9",
     "npm:@rdfjs/types@^2.0.1": "2.0.1",
     "npm:ai@^6.0.195": "6.0.264_zod@4.4.3",
@@ -300,6 +302,27 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
+    "@jsr/std__encoding@1.0.11": {
+      "integrity": "sha512-4SmW8WXf4x4FjkxVpxbir06QYwxw/h/2+RU5A66iKXbJC9WAYCICZkH01mcOGj8FgSitF/lSTlT585RZfo8Ukg==",
+      "tarball": "https://npm.jsr.io/~/11/@jsr/std__encoding/1.0.11.tgz"
+    },
+    "@jsr/wazoo__sparql-engine@0.4.1": {
+      "integrity": "sha512-Cx6fEJnQG3K4m2jv4c/Yi9f1QCt/j+CeJjeoMFW1iIfk+j7/3AJDfe1WSrVbIEQSzyPhxopgO1R0oH8ybWZDhQ==",
+      "dependencies": [
+        "@rdfjs/types"
+      ],
+      "tarball": "https://npm.jsr.io/~/11/@jsr/wazoo__sparql-engine/0.4.1.tgz"
+    },
+    "@jsr/worlds__sdk@0.6.1_zod@4.4.3": {
+      "integrity": "sha512-vT3XyTUFkUkLBSU5tsyBbf6Noot+pQ0JNzPhSXg5kTuVWXqeHYwMvOu62ZuFai/c89SjruOfOWCQ2VCnQkcalA==",
+      "dependencies": [
+        "@jsr/std__encoding",
+        "@jsr/wazoo__sparql-engine",
+        "@rdfjs/types",
+        "ai"
+      ],
+      "tarball": "https://npm.jsr.io/~/11/@jsr/worlds__sdk/0.6.1.tgz"
+    },
     "@langchain/core@1.2.9": {
       "integrity": "sha512-conzSEj9Zu1AyXJLXsSbgrtxtxinmI1yGqQ5CIJZSoV5rvv+yvQE/vgBnoySpBQ/bl3YPgj2FL/gbDjWykLSfg==",
       "dependencies": [
@@ -575,6 +598,14 @@
       "npm:@langchain/textsplitters@^1.0.1",
       "npm:@rdfjs/types@^2.0.1",
       "npm:miniflare@^4.20260730.0"
-    ]
+    ],
+    "packageJson": {
+      "dependencies": [
+        "npm:@jsr/wazoo__sparql-engine@~0.4.1",
+        "npm:@jsr/worlds__sdk@~0.6.1",
+        "npm:@langchain/textsplitters@^1.0.1",
+        "npm:@rdfjs/types@^2.0.1"
+      ]
+    }
   }
 }
