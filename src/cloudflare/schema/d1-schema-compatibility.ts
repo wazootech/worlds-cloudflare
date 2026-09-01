@@ -38,9 +38,16 @@ const REQUIRED_COLUMNS: Record<string, string[]> = {
 /** Inspect the actual D1 schema and report missing required tables or columns. */
 export async function checkD1SchemaCompatibility(
   connection: D1ConnectionDriver,
+  options: { worldUid?: string } = {},
 ): Promise<D1SchemaCompatibilityReport> {
   const issues: D1SchemaCompatibilityIssue[] = [];
-  for (const [table, columns] of Object.entries(REQUIRED_COLUMNS)) {
+  const requiredColumns = Object.fromEntries(
+    Object.entries(REQUIRED_COLUMNS).map(([table, columns]) => [
+      table,
+      options.worldUid ? [...columns, "world_uid"] : columns,
+    ]),
+  );
+  for (const [table, columns] of Object.entries(requiredColumns)) {
     const tableResult = await connection.execute<{ name: string }>({
       sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
       args: [table],
@@ -66,8 +73,9 @@ export async function checkD1SchemaCompatibility(
 /** Validate the schema and throw an actionable error before serving traffic. */
 export async function assertD1SchemaCompatible(
   connection: D1ConnectionDriver,
+  options: { worldUid?: string } = {},
 ): Promise<void> {
-  const report = await checkD1SchemaCompatibility(connection);
+  const report = await checkD1SchemaCompatibility(connection, options);
   if (!report.compatible) {
     throw new Error(
       `D1 schema is incompatible with @worlds/cloudflare: ${

@@ -183,7 +183,9 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       await this.connection.execute({ sql: ddl });
     }
     if (this.worldUid) {
-      await assertD1SchemaCompatible(this.connection);
+      await assertD1SchemaCompatible(this.connection, {
+        worldUid: this.worldUid,
+      });
     }
     await this.refreshCount();
   }

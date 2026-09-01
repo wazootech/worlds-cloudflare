@@ -14,9 +14,13 @@ Deno.test("D1 schema compatibility accepts the generated schema", async () => {
     for (const ddl of builder.buildTables()) {
       await substrate.connection.execute({ sql: ddl });
     }
-    const report = await checkD1SchemaCompatibility(substrate.connection);
+    const report = await checkD1SchemaCompatibility(substrate.connection, {
+      worldUid: "world-a",
+    });
     assertEquals(report, { compatible: true, issues: [] });
-    await assertD1SchemaCompatible(substrate.connection);
+    await assertD1SchemaCompatible(substrate.connection, {
+      worldUid: "world-a",
+    });
   } finally {
     await substrate.dispose();
   }
@@ -35,13 +39,22 @@ Deno.test("D1 schema compatibility reports missing tables and columns", async ()
     await substrate.connection.execute({
       sql: "CREATE TABLE quads (id TEXT PRIMARY KEY)",
     });
-    const partial = await checkD1SchemaCompatibility(substrate.connection);
+    const partial = await checkD1SchemaCompatibility(substrate.connection, {
+      worldUid: "world-a",
+    });
     assertEquals(
       partial.issues.some((issue) => issue.detail === "missing column s"),
       true,
     );
+    assertEquals(
+      partial.issues.some((issue) =>
+        issue.detail === "missing column world_uid"
+      ),
+      true,
+    );
     await assertRejects(
-      () => assertD1SchemaCompatible(substrate.connection),
+      () =>
+        assertD1SchemaCompatible(substrate.connection, { worldUid: "world-a" }),
       Error,
       "quads: missing column",
     );
