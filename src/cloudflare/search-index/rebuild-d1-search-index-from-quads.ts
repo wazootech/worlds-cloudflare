@@ -38,6 +38,7 @@ export async function rebuildD1SearchIndexFromQuads(
     include,
     exclude,
     readPageSize,
+    searchQueryBuilder,
   } = options;
   const pageSize = Math.max(
     1,
@@ -53,6 +54,7 @@ export async function rebuildD1SearchIndexFromQuads(
     const query = buildMatchQuadsQuery(
       { subject: null, predicate: null, object: null, graph: null },
       { afterQuadId, limit: pageSize },
+      searchQueryBuilder.worldUid,
     );
     const resultSet = await connection.execute(query);
 

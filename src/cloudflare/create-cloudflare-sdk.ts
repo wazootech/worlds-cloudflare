@@ -21,6 +21,9 @@ import { D1SearchQueryBuilder } from "@/cloudflare/search-index/d1-search-query-
 export interface CloudflareWorldsSdkOptions extends D1ClientBaseOptions {
   /** database is the raw D1 binding (miniflare or a real Worker binding). */
   database: D1DatabaseLike;
+
+  /** worldUid scopes all quad and search-index operations when provided. */
+  worldUid?: string;
 }
 
 /**
@@ -34,9 +37,15 @@ export async function createCloudflareWorldsSdk(
   options: CloudflareWorldsSdkOptions,
 ): Promise<WorldsSdkInterface> {
   const vectorDimensions = options.vectorDimensions ?? 1536;
-  const connection = new D1ConnectionDriver(options.database);
-  const schema = new D1SchemaBuilder(vectorDimensions);
-  const searchQuery = new D1SearchQueryBuilder(vectorDimensions);
+  const connection = new D1ConnectionDriver(options.database, {
+    worldUid: options.worldUid,
+  });
+  const schema = new D1SchemaBuilder(vectorDimensions, {
+    worldUid: options.worldUid,
+  });
+  const searchQuery = new D1SearchQueryBuilder(vectorDimensions, {
+    worldUid: options.worldUid,
+  });
 
   const d1RdfjsStore = new D1RdfjsStore({
     connection,
@@ -44,6 +53,7 @@ export async function createCloudflareWorldsSdk(
     maxLookupChunkSize: options.maxLookupChunkSize,
     maxWriteBatchSize: options.maxWriteBatchSize,
     schemaBuilder: schema,
+    worldUid: options.worldUid,
   });
 
   await d1RdfjsStore.ensureSchema();

@@ -18,6 +18,7 @@ import { DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE } from "@/cloudflare/d1/d1-batch-execu
 import { DEFAULT_D1_MAX_WRITE_BATCH_SIZE } from "@/cloudflare/d1/d1-batch-executor.ts";
 import { quadFromD1Row, quadToInsertRow } from "@/cloudflare/d1/d1-quad-row.ts";
 import { D1SchemaBuilder } from "@/cloudflare/schema/d1-schema-builder.ts";
+import { assertD1SchemaCompatible } from "@/cloudflare/schema/d1-schema-compatibility.ts";
 import { D1QuadStream } from "./d1-quad-stream.ts";
 
 /**
@@ -38,6 +39,9 @@ export interface D1RdfjsStoreOptions {
 
   /** schemaBuilder supplies the DDL the store applies in ensureSchema(). */
   schemaBuilder?: D1SchemaBuilder;
+
+  /** worldUid scopes all reads and writes when schema has a world_uid column. */
+  worldUid?: string;
 }
 
 /**
@@ -140,6 +144,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
   private readonly writeBatchSize: number;
   private readonly lookupChunkSize: number;
   private readonly schemaBuilder: D1SchemaBuilder;
+  private readonly worldUid?: string;
   /** serialized write queue: every mutation runs after the previous one. */
   private mutationQueue: Promise<void> = Promise.resolve();
   /** synchronous size approximation, refreshed after every write. */
@@ -152,7 +157,9 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
     this.lookupChunkSize = options.maxLookupChunkSize ??
       DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE;
-    this.schemaBuilder = options.schemaBuilder ?? new D1SchemaBuilder(32);
+    this.schemaBuilder = options.schemaBuilder ??
+      new D1SchemaBuilder(32, { worldUid: options.worldUid });
+    this.worldUid = options.worldUid;
   }
 
   /**
@@ -175,13 +182,19 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     for (const ddl of statements) {
       await this.connection.execute({ sql: ddl });
     }
+    if (this.worldUid) {
+      await assertD1SchemaCompatible(this.connection);
+    }
     await this.refreshCount();
   }
 
   private async refreshCount(): Promise<void> {
-    const result = await this.connection.execute<{ count: number }>(
-      { sql: "SELECT COUNT(*) AS count FROM quads" },
-    );
+    const result = await this.connection.execute<{ count: number }>({
+      sql: this.worldUid
+        ? "SELECT COUNT(*) AS count FROM quads WHERE world_uid = ?"
+        : "SELECT COUNT(*) AS count FROM quads",
+      args: this.worldUid ? [this.worldUid] : [],
+    });
     this.liveCount = Number(result.rows[0]?.count ?? 0);
   }
 
@@ -224,7 +237,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       });
 
       if (isReplaceImportCommit(context)) {
-        await executor.stage(buildWipeAllGraphDataStatements());
+        await executor.stage(buildWipeAllGraphDataStatements(this.worldUid));
       }
 
       const targetedDeletions = patch.deletions ?? [];
@@ -236,7 +249,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
           executor,
           deletionIds,
           this.lookupChunkSize,
-          (chunk) => [buildDeleteQuadsByQuadIds(chunk)],
+          (chunk) => [buildDeleteQuadsByQuadIds(chunk, this.worldUid)],
         );
       }
 
@@ -246,6 +259,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
           this.connection,
           proposedIds,
           this.lookupChunkSize,
+          this.worldUid,
         );
 
         const novelRows: InsertQuadRow[] = [];
@@ -257,7 +271,11 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
         }
 
         if (novelRows.length > 0) {
-          await executor.stage(buildBulkInsertQuads(novelRows));
+          await executor.stage(
+            buildBulkInsertQuads(
+              novelRows.map((row) => ({ ...row, world_uid: this.worldUid })),
+            ),
+          );
         }
       }
 
@@ -298,7 +316,10 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       : quadOrSubject as rdfjs.Quad;
     void this.enqueueWrite(async () => {
       await this.connection.batch(
-        buildBulkInsertQuads([await quadToInsertRow(quad)]),
+        buildBulkInsertQuads([{
+          ...(await quadToInsertRow(quad)),
+          world_uid: this.worldUid,
+        }]),
       );
     });
     return this;
@@ -307,7 +328,9 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
   public removeQuad(quad: rdfjs.Quad): this {
     void this.enqueueWrite(async () => {
       const [id] = await hashQuads([quad]);
-      await this.connection.batch([buildDeleteQuadsByQuadIds([id])]);
+      await this.connection.batch([
+        buildDeleteQuadsByQuadIds([id], this.worldUid),
+      ]);
     });
     return this;
   }
@@ -356,6 +379,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       const { sql, args } = buildMatchQuadsQuery(
         pattern,
         { afterQuadId, limit: this.matchPageSize },
+        this.worldUid,
       );
       const result = await this.connection.execute<Record<string, unknown>>({
         sql,
@@ -403,7 +427,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       predicate: predicate ?? null,
       object: object ?? null,
       graph: graph ?? null,
-    });
+    }, this.worldUid);
     const result = await this.connection.execute<{ count: number }>({
       sql,
       args,
@@ -479,11 +503,14 @@ async function queryCachePresence(
   connection: D1ConnectionDriver,
   quadIds: string[],
   lookupChunkSize: number,
+  worldUid?: string,
 ): Promise<Set<string>> {
   const cachedIds = new Set<string>();
   for (let index = 0; index < quadIds.length; index += lookupChunkSize) {
     const chunk = quadIds.slice(index, index + lookupChunkSize);
-    const result = await connection.execute(buildSelectExistingQuadIds(chunk));
+    const result = await connection.execute(
+      buildSelectExistingQuadIds(chunk, worldUid),
+    );
     for (const row of result.rows) {
       if (row.id) {
         cachedIds.add(String(row.id));

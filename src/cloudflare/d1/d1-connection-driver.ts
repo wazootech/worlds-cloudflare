@@ -42,8 +42,19 @@ export interface D1Result<Row = Record<string, unknown>> {
  * runs its statements sequentially in a transaction and rolls back the whole
  * sequence on any failure.
  */
+export interface D1ConnectionDriverOptions {
+  worldUid?: string;
+}
+
 export class D1ConnectionDriver {
-  public constructor(private readonly database: D1DatabaseLike) {}
+  public readonly worldUid?: string;
+
+  public constructor(
+    private readonly database: D1DatabaseLike,
+    options?: D1ConnectionDriverOptions,
+  ) {
+    this.worldUid = options?.worldUid;
+  }
 
   /**
    * execute runs a single parameterized statement and returns its rows.

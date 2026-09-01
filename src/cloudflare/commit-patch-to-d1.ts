@@ -23,6 +23,9 @@ export interface CommitPatchToD1Options extends D1ClientBaseOptions {
 
   /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 100 (D1's batch cap). */
   maxWriteBatchSize?: number;
+
+  /** worldUid scopes this commit to one logical world. */
+  worldUid?: string;
 }
 
 export interface CommitPatchToD1Result {
@@ -36,9 +39,10 @@ export interface CommitPatchToD1Result {
 async function executeReplaceImportWipe(
   connection: D1ConnectionDriver,
   writeBatchSize: number,
+  worldUid?: string,
 ): Promise<void> {
   const executor = new D1BatchExecutor({ connection, writeBatchSize });
-  await executor.stage(buildWipeAllGraphDataStatements());
+  await executor.stage(buildWipeAllGraphDataStatements(worldUid));
   await executor.flush();
 }
 
@@ -57,6 +61,7 @@ export async function commitPatchToD1(
     maxWriteBatchSize,
     include,
     exclude,
+    worldUid,
   } = options;
   const lookupChunkSize = maxLookupChunkSize ?? 100;
   const writeBatchSize = maxWriteBatchSize ?? DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
@@ -64,7 +69,7 @@ export async function commitPatchToD1(
   const batchExecutor = new D1BatchExecutor({ connection, writeBatchSize });
 
   if (isReplaceImportCommit(context)) {
-    await executeReplaceImportWipe(connection, writeBatchSize);
+    await executeReplaceImportWipe(connection, writeBatchSize, worldUid);
   }
 
   const matcher = filterQuads({ include, exclude });
@@ -83,7 +88,7 @@ export async function commitPatchToD1(
         batchExecutor,
         computedDeletionQuadIds,
         lookupChunkSize,
-        (chunk) => [buildDeleteQuadsByQuadIds(chunk)],
+        (chunk) => [buildDeleteQuadsByQuadIds(chunk, worldUid)],
       );
     }
   }
@@ -97,6 +102,7 @@ export async function commitPatchToD1(
       connection,
       proposedQuadIds,
       lookupChunkSize,
+      worldUid,
     );
 
     for (let i = 0; i < targetedInsertions.length; i++) {
@@ -112,14 +118,18 @@ export async function commitPatchToD1(
         batchExecutor,
         novelQuadIds,
         lookupChunkSize,
-        (chunk) => [buildDeleteQuadsByQuadIds(chunk)],
+        (chunk) => [buildDeleteQuadsByQuadIds(chunk, worldUid)],
       );
 
       const novelRows: InsertQuadRow[] = [];
       for (let index = 0; index < novelInsertions.length; index++) {
         novelRows.push(await quadToInsertRow(novelInsertions[index]!));
       }
-      await batchExecutor.stage(buildBulkInsertQuads(novelRows));
+      await batchExecutor.stage(
+        buildBulkInsertQuads(
+          novelRows.map((row) => ({ ...row, world_uid: worldUid })),
+        ),
+      );
     }
   }
 
@@ -149,11 +159,14 @@ async function queryCachePresence(
   connection: D1ConnectionDriver,
   quadIds: string[],
   lookupChunkSize: number,
+  worldUid?: string,
 ): Promise<Set<string>> {
   const cachedIds = new Set<string>();
   for (let index = 0; index < quadIds.length; index += lookupChunkSize) {
     const chunk = quadIds.slice(index, index + lookupChunkSize);
-    const result = await connection.execute(buildSelectExistingQuadIds(chunk));
+    const result = await connection.execute(
+      buildSelectExistingQuadIds(chunk, worldUid),
+    );
     for (const row of result.rows) {
       if (row.id) {
         cachedIds.add(String(row.id));

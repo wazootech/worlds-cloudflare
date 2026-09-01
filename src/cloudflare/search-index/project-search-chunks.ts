@@ -22,6 +22,8 @@ export interface ProjectSearchChunksOptions extends D1ClientBaseOptions {
   textSplitter: TextSplitterInterface;
   maxWriteBatchSize?: number;
   searchQueryBuilder: D1SearchQueryBuilder;
+
+  worldUid?: string;
 }
 
 /**
@@ -145,6 +147,7 @@ async function buildChunkStatements(
         graph: chunk.graph,
         value: chunk.value,
         fts_value,
+        world_uid: options.worldUid,
       }),
     );
   }

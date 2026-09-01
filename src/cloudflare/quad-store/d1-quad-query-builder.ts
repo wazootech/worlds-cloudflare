@@ -49,6 +49,8 @@ export interface InsertQuadRow {
 
   o_lang?: string | null;
 
+  world_uid?: string;
+
   g: string;
 
   g_type: string;
@@ -60,29 +62,40 @@ export function generatePlaceholders(count: number): string {
 
 export function buildDeleteQuadsByQuadIds(
   quadIds: string[],
+  worldUid?: string,
 ): { sql: string; args: string[] } {
   const placeholders = generatePlaceholders(quadIds.length);
   return {
-    sql: `DELETE FROM quads WHERE id IN (${placeholders})`,
-    args: quadIds,
+    sql: `DELETE FROM quads WHERE id IN (${placeholders})${
+      worldUid ? " AND world_uid = ?" : ""
+    }`,
+    args: worldUid ? [...quadIds, worldUid] : quadIds,
   };
 }
 
 export function buildSelectExistingQuadIds(
   quadIds: string[],
+  worldUid?: string,
 ): { sql: string; args: string[] } {
   const placeholders = generatePlaceholders(quadIds.length);
   return {
-    sql: `SELECT id FROM quads WHERE id IN (${placeholders})`,
-    args: quadIds,
+    sql: `SELECT id FROM quads WHERE id IN (${placeholders})${
+      worldUid ? " AND world_uid = ?" : ""
+    }`,
+    args: worldUid ? [...quadIds, worldUid] : quadIds,
   };
 }
 
 export function buildMatchQuadsQuery(
   pattern: D1QuadPattern,
   pageOptions?: { afterQuadId?: string; limit?: number },
+  worldUid?: string,
 ): { sql: string; args: (string | null)[] } {
   const { conditions, args } = buildD1QuadPatternWhereClause(pattern);
+  if (worldUid) {
+    conditions.push("world_uid = ?");
+    args.push(worldUid);
+  }
 
   if (pageOptions?.afterQuadId) {
     conditions.push("id > ?");
@@ -108,8 +121,13 @@ export function buildMatchQuadsQuery(
 
 export function buildCountQuadsQuery(
   pattern: D1QuadPattern,
+  worldUid?: string,
 ): { sql: string; args: (string | null)[] } {
   const { conditions, args } = buildD1QuadPatternWhereClause(pattern);
+  if (worldUid) {
+    conditions.push("world_uid = ?");
+    args.push(worldUid);
+  }
   const whereClause = conditions.length > 0
     ? `WHERE ${conditions.join(" AND ")}`
     : "";
@@ -145,7 +163,11 @@ export function buildBulkInsertQuads(
       rowOffset + D1_INSERT_QUAD_ROWS_PER_STATEMENT,
     );
     const valuePlaceholders = rowBatch
-      .map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .map(() =>
+        rowBatch[0]?.world_uid !== undefined
+          ? "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          : "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
       .join(", ");
     const args: (string | null)[] = [];
 
@@ -161,12 +183,16 @@ export function buildBulkInsertQuads(
         insertQuadRow.o_lang ?? null,
         insertQuadRow.g,
         insertQuadRow.g_type,
+        ...(insertQuadRow.world_uid !== undefined
+          ? [insertQuadRow.world_uid]
+          : []),
       );
     }
 
     if (
-      args.length > D1_INSERT_QUAD_ROWS_PER_STATEMENT *
-          D1_INSERT_QUAD_COLUMN_COUNT
+      args.length > rowBatch.length *
+          (D1_INSERT_QUAD_COLUMN_COUNT +
+            (rowBatch[0]?.world_uid !== undefined ? 1 : 0))
     ) {
       throw new Error(
         `buildBulkInsertQuads: batch exceeds D1 host-parameter budget (${args.length})`,
@@ -175,7 +201,9 @@ export function buildBulkInsertQuads(
 
     statements.push({
       sql:
-        `INSERT OR REPLACE INTO quads (id, s, s_type, p, o, o_type, o_datatype, o_lang, g, g_type) VALUES ${valuePlaceholders}`,
+        `INSERT OR REPLACE INTO quads (id, s, s_type, p, o, o_type, o_datatype, o_lang, g, g_type${
+          rowBatch[0]?.world_uid !== undefined ? ", world_uid" : ""
+        }) VALUES ${valuePlaceholders}`,
       args,
     });
   }
@@ -241,11 +269,12 @@ function appendTermCondition(
   }
 }
 
-export function buildWipeAllGraphDataStatements(): Array<
-  { sql: string; args: [] }
-> {
+export function buildWipeAllGraphDataStatements(
+  worldUid?: string,
+): Array<{ sql: string; args: (string | undefined)[] }> {
+  const suffix = worldUid ? " WHERE world_uid = ?" : "";
   return [
-    { sql: "DELETE FROM chunks", args: [] },
-    { sql: "DELETE FROM quads", args: [] },
+    { sql: `DELETE FROM chunks${suffix}`, args: worldUid ? [worldUid] : [] },
+    { sql: `DELETE FROM quads${suffix}`, args: worldUid ? [worldUid] : [] },
   ];
 }

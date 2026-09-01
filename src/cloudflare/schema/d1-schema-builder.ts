@@ -16,10 +16,18 @@ const D1_MAX_VECTOR_DIMENSIONS = 1536;
  * D1 (Vectorize). FTS5 external-content tables and sync triggers are
  * supported on D1.
  */
+export interface D1SchemaBuilderOptions {
+  worldUid?: string;
+}
+
 export class D1SchemaBuilder {
   public readonly vectorDimensions: number;
+  public readonly worldUid?: string;
 
-  public constructor(vectorDimensions: number) {
+  public constructor(
+    vectorDimensions: number,
+    options?: D1SchemaBuilderOptions,
+  ) {
     const dimensions = Math.floor(Number(vectorDimensions));
     if (
       !Number.isFinite(dimensions) ||
@@ -33,6 +41,7 @@ export class D1SchemaBuilder {
       );
     }
     this.vectorDimensions = dimensions;
+    this.worldUid = options?.worldUid;
   }
 
   /**
@@ -61,11 +70,15 @@ export class D1SchemaBuilder {
   }
 
   public buildD1QuadsTable(): string {
-    return "CREATE TABLE IF NOT EXISTS quads (id TEXT PRIMARY KEY, s TEXT NOT NULL, s_type TEXT NOT NULL, p TEXT NOT NULL, o TEXT NOT NULL, o_type TEXT NOT NULL, o_datatype TEXT, o_lang TEXT, g TEXT NOT NULL, g_type TEXT NOT NULL)";
+    return `CREATE TABLE IF NOT EXISTS quads (id TEXT PRIMARY KEY, s TEXT NOT NULL, s_type TEXT NOT NULL, p TEXT NOT NULL, o TEXT NOT NULL, o_type TEXT NOT NULL, o_datatype TEXT, o_lang TEXT, g TEXT NOT NULL, g_type TEXT NOT NULL${
+      this.worldUid ? ", world_uid TEXT NOT NULL" : ""
+    })`;
   }
 
   public buildD1ChunksTable(): string {
-    return `CREATE TABLE IF NOT EXISTS chunks (id INTEGER PRIMARY KEY AUTOINCREMENT, quad_id TEXT NOT NULL, subject TEXT NOT NULL, predicate TEXT NOT NULL, graph TEXT NOT NULL, value TEXT NOT NULL, fts_value TEXT NOT NULL, vector F32_BLOB(${this.vectorDimensions}))`;
+    return `CREATE TABLE IF NOT EXISTS chunks (id INTEGER PRIMARY KEY AUTOINCREMENT, quad_id TEXT NOT NULL, subject TEXT NOT NULL, predicate TEXT NOT NULL, graph TEXT NOT NULL, value TEXT NOT NULL, fts_value TEXT NOT NULL, vector F32_BLOB(${this.vectorDimensions})${
+      this.worldUid ? ", world_uid TEXT NOT NULL" : ""
+    })`;
   }
 
   public buildD1ChunksQuadIdIndex(): string {
