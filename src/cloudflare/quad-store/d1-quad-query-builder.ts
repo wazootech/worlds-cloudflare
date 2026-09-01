@@ -25,8 +25,12 @@ export const DEFAULT_D1_MATCH_PAGE_SIZE = 1000;
 
 const D1_INSERT_QUAD_COLUMN_COUNT = 10;
 
-/** D1 caps bound params at 100/statement — 10 quads × 10 columns fits exactly. */
-export const D1_INSERT_QUAD_ROWS_PER_STATEMENT = 10;
+/**
+ * Keep quad writes to one row per statement. D1 has exhibited incorrect
+ * parameter binding for multi-row INSERT OR REPLACE statements in batches;
+ * D1BatchExecutor still groups these single-row statements atomically.
+ */
+export const D1_INSERT_QUAD_ROWS_PER_STATEMENT = 1;
 
 export interface InsertQuadRow {
   quad_id: string;
