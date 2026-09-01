@@ -14,10 +14,22 @@ Deno.test("D1 schema compatibility accepts the generated schema", async () => {
     for (const ddl of builder.buildTables()) {
       await substrate.connection.execute({ sql: ddl });
     }
+    await substrate.connection.execute({
+      sql:
+        "CREATE TABLE worlds_data_plane_schema (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)",
+    });
+    await substrate.connection.execute({
+      sql:
+        "INSERT INTO worlds_data_plane_schema (version, applied_at) VALUES (1, datetime('now'))",
+    });
     const report = await checkD1SchemaCompatibility(substrate.connection, {
       worldUid: "world-a",
     });
-    assertEquals(report, { compatible: true, issues: [] });
+    assertEquals(report, {
+      compatible: true,
+      issues: [],
+      schemaVersion: 1,
+    });
     await assertD1SchemaCompatible(substrate.connection, {
       worldUid: "world-a",
     });
@@ -57,6 +69,43 @@ Deno.test("D1 schema compatibility reports missing tables and columns", async ()
         assertD1SchemaCompatible(substrate.connection, { worldUid: "world-a" }),
       Error,
       "quads: missing column",
+    );
+  } finally {
+    await substrate.dispose();
+  }
+});
+
+Deno.test("D1 schema compatibility rejects an unexpected schema version", async () => {
+  const substrate = await createTestD1();
+  try {
+    const builder = new D1SchemaBuilder(32, { worldUid: "world-a" });
+    for (const ddl of builder.buildTables()) {
+      await substrate.connection.execute({ sql: ddl });
+    }
+    await substrate.connection.execute({
+      sql:
+        "CREATE TABLE worlds_data_plane_schema (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)",
+    });
+    await substrate.connection.execute({
+      sql:
+        "INSERT INTO worlds_data_plane_schema (version, applied_at) VALUES (99, datetime('now'))",
+    });
+
+    const report = await checkD1SchemaCompatibility(substrate.connection, {
+      worldUid: "world-a",
+    });
+    assertEquals(report.compatible, false);
+    assertEquals(
+      report.issues.some((issue) =>
+        issue.detail === "expected schema version 1, found 99"
+      ),
+      true,
+    );
+    await assertRejects(
+      () =>
+        assertD1SchemaCompatible(substrate.connection, { worldUid: "world-a" }),
+      Error,
+      "expected schema version 1, found 99",
     );
   } finally {
     await substrate.dispose();

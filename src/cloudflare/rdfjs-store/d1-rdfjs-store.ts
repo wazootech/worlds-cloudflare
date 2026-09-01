@@ -182,6 +182,15 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     for (const ddl of statements) {
       await this.connection.execute({ sql: ddl });
     }
+    await this.connection.execute({
+      sql:
+        `CREATE TABLE IF NOT EXISTS worlds_data_plane_schema (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+    });
+    await this.connection.execute({
+      sql:
+        "INSERT OR IGNORE INTO worlds_data_plane_schema (version) VALUES (?)",
+      args: [1],
+    });
     if (this.worldUid) {
       await assertD1SchemaCompatible(this.connection, {
         worldUid: this.worldUid,
