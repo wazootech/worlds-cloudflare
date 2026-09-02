@@ -66,11 +66,18 @@ export interface VectorizeIndexLike {
   deleteByIds(ids: string[]): Promise<unknown>;
 }
 
-/** A single Vectorize query match, loosely typed for structural compatibility. */
+/**
+ * A single Vectorize query match, loosely typed for structural compatibility
+ * with the real binding: workers-types' `VectorizeMatch.metadata` is
+ * `VectorizeVectorMetadata` (value or record), so `unknown` keeps the real
+ * `VectorizeIndex` assignable without a workers-types dependency. Consumers
+ * that need metadata coerce it (see metadataToRecord in
+ * vectorize-vector-search-index.ts).
+ */
 export interface VectorizeMatchLike {
   id: string;
   score: number;
-  metadata?: Record<string, string>;
+  metadata?: unknown;
 }
 
 /**
