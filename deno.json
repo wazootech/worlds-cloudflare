@@ -1,6 +1,6 @@
 {
   "name": "@worlds/cloudflare",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Cloudflare D1 durable backend for the Worlds client — RDF/JS quad primitive packaged with the worlds impl.",
   "license": "WTFPL",
   "nodeModulesDir": "auto",
