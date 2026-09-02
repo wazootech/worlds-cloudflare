@@ -107,6 +107,25 @@ export class D1SearchQueryBuilder {
     };
   }
 
+  /**
+   * buildChunkVectorLookupByQuadIds selects the fields needed to recompute
+   * deterministic vector ids (`buildSearchResultId`) for the chunk rows of
+   * the given quads — used by the projector to delete stale vectors from the
+   * outside-D1 vector index before refreshing chunk rows.
+   */
+  public buildChunkVectorLookupByQuadIds(
+    quadIds: string[],
+  ): SqlStatement {
+    const placeholders = generatePlaceholders(quadIds.length);
+    return {
+      sql:
+        `SELECT quad_id, subject, predicate, graph, value FROM chunks WHERE quad_id IN (${placeholders})${
+          this.worldUid ? " AND world_uid = ?" : ""
+        }`,
+      args: this.worldUid ? [...quadIds, this.worldUid] : quadIds,
+    };
+  }
+
   public sanitizeFtsQuery(query: string): string {
     return sanitizeFtsQuery(query);
   }

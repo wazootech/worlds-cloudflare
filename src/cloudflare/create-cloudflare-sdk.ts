@@ -7,6 +7,8 @@ import {
   CloudflareSearchIndex,
   D1SearchIndexProjector,
 } from "@/cloudflare/search-index/mod.ts";
+import { VectorizeVectorSearchIndex } from "@/cloudflare/search-index/vector-search/mod.ts";
+import type { VectorizeIndexLike } from "@/cloudflare/search-index/vector-search/mod.ts";
 import { D1QuadStore } from "@/cloudflare/quad-store/mod.ts";
 import type { D1ClientBaseOptions } from "@/cloudflare/d1-client-base-options.ts";
 import type { D1DatabaseLike } from "@/cloudflare/d1/d1-connection-driver.ts";
@@ -32,6 +34,14 @@ export interface CloudflareWorldsSdkOptions extends D1ClientBaseOptions {
    * `limit` (100) when unset.
    */
   candidateCount?: number;
+
+  /**
+   * vectorize is the Cloudflare Vectorize binding for the outside-D1 vector
+   * index (Phase C, worlds-api#1). The index must register `world_uid` as a
+   * filterable metadata property. When set (with an embeddingService), imports
+   * populate vectors and searches fuse keyword + vector rankings.
+   */
+  vectorize?: VectorizeIndexLike;
 }
 
 /**
@@ -69,11 +79,19 @@ export async function createCloudflareWorldsSdk(
   const textSplitter = options.textSplitter ??
     new RecursiveCharacterTextSplitter({ chunkSize: 1000 });
 
+  const vectorSearch = options.vectorize
+    ? new VectorizeVectorSearchIndex({
+      index: options.vectorize,
+      worldUid: options.worldUid,
+    })
+    : undefined;
+
   const searchIndexProjector = new D1SearchIndexProjector({
     ...options,
     connection,
     searchQueryBuilder: searchQuery,
     textSplitter,
+    vectorSearch,
   });
 
   const searchIndex = new CloudflareSearchIndex({
@@ -81,6 +99,7 @@ export async function createCloudflareWorldsSdk(
     connection,
     searchQueryBuilder: searchQuery,
     textSplitter,
+    vectorSearch,
   });
 
   const quadStore = new D1QuadStore({
