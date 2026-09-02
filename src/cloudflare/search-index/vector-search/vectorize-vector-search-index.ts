@@ -64,11 +64,17 @@ export class VectorizeVectorSearchIndex implements VectorSearchIndex {
 }
 
 function metadataToRecord(
-  metadata: Record<string, string | number | boolean> | undefined,
+  metadata: unknown,
 ): Record<string, string> | undefined {
-  if (!metadata) return undefined;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return undefined;
+  }
   const result: Record<string, string> = {};
-  for (const [key, value] of Object.entries(metadata)) {
+  for (
+    const [key, value] of Object.entries(
+      metadata as Record<string, unknown>,
+    )
+  ) {
     result[key] = String(value);
   }
   return result;
