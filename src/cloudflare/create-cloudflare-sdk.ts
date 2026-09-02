@@ -24,6 +24,14 @@ export interface CloudflareWorldsSdkOptions extends D1ClientBaseOptions {
 
   /** worldUid scopes all quad and search-index operations when provided. */
   worldUid?: string;
+
+  /**
+   * candidateCount sizes the search-index candidate pool at the SQL level
+   * (provider-internal per the hosted search contract, worlds-api#30 D2).
+   * Routes pass `max(limit, world.topK)`. Defaults to the search index's
+   * `limit` (100) when unset.
+   */
+  candidateCount?: number;
 }
 
 /**

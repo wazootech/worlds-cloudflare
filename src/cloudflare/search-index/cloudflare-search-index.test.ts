@@ -122,6 +122,132 @@ Deno.test("CloudflareSearchIndex - graph-scoped search excludes other graphs", a
   }
 });
 
+Deno.test("CloudflareSearchIndex - emits contract-normalized rrf scores with scoreType", async () => {
+  const { searchIndex, quadStore, dispose } = await createTestContext();
+  try {
+    await quadStore.import({
+      source: {
+        kind: "quads",
+        quads: [
+          createQuad(
+            namedNode("urn:first"),
+            namedNode("urn:knows"),
+            literal("alpha beta topic"),
+          ),
+          createQuad(
+            namedNode("urn:second"),
+            namedNode("urn:knows"),
+            literal("beta topic gamma"),
+          ),
+        ],
+      },
+    });
+
+    const response = await searchIndex.search({ query: "beta" });
+    const results = response.results ?? [];
+    assertEquals(results.length, 2);
+
+    // Rows arrive ordered by rank (best first), so rank 0 maps to exactly 1.0
+    // on the contract scale (score = k/(k+rank), k = 60).
+    assertEquals(results[0].score, 1.0);
+    assertEquals(results[0].scoreType, "rrf");
+
+    // Monotone: lower-ranked hits score strictly below rank 0, still on [0, 1].
+    assertEquals(results[1].score < results[0].score, true);
+    assertEquals(results[1].score > 0 && results[1].score < 1, true);
+    assertEquals(results[1].scoreType, "rrf");
+  } finally {
+    await dispose();
+  }
+});
+
+Deno.test("CloudflareSearchIndex - candidateCount sizes the internal SQL candidate pool", async () => {
+  const { quadStore, connection, searchQueryBuilder, dispose } =
+    await createTestContext();
+  try {
+    await quadStore.import({
+      source: {
+        kind: "quads",
+        quads: [
+          createQuad(
+            namedNode("urn:one"),
+            namedNode("urn:knows"),
+            literal("shared topic one"),
+          ),
+          createQuad(
+            namedNode("urn:two"),
+            namedNode("urn:knows"),
+            literal("shared topic two"),
+          ),
+          createQuad(
+            namedNode("urn:three"),
+            namedNode("urn:knows"),
+            literal("shared topic three"),
+          ),
+        ],
+      },
+    });
+
+    // candidateCount = 1 restricts the SQL pool to the single top-ranked hit
+    // (provider-internal; routes pass max(limit, world.topK) per D2).
+    const poolOne = new CloudflareSearchIndex({
+      connection,
+      searchQueryBuilder,
+      textSplitter: new RecursiveCharacterTextSplitter({ chunkSize: 1000 }),
+      candidateCount: 1,
+    });
+    const one = await poolOne.search({ query: "shared" });
+    assertEquals(one.results?.length, 1);
+
+    // Without candidateCount, the pool defaults to limit (100), returning all
+    // three candidate hits.
+    const poolAll = new CloudflareSearchIndex({
+      connection,
+      searchQueryBuilder,
+      textSplitter: new RecursiveCharacterTextSplitter({ chunkSize: 1000 }),
+    });
+    const all = await poolAll.search({ query: "shared" });
+    assertEquals(all.results?.length, 3);
+  } finally {
+    await dispose();
+  }
+});
+
+Deno.test("CloudflareSearchIndex - minScore floor applies to the normalized scale", async () => {
+  const { searchIndex, quadStore, dispose } = await createTestContext();
+  try {
+    await quadStore.import({
+      source: {
+        kind: "quads",
+        quads: [
+          createQuad(
+            namedNode("urn:top"),
+            namedNode("urn:knows"),
+            literal("needle in the haystack"),
+          ),
+          createQuad(
+            namedNode("urn:other"),
+            namedNode("urn:knows"),
+            literal("distant needle reference"),
+          ),
+        ],
+      },
+    });
+
+    // Only rank 0 scores exactly 1.0 on the normalized scale, so a floor of
+    // 1.0 keeps just the top hit — impossible on the old raw scale (max ~0.017).
+    const response = await searchIndex.search({
+      query: "needle",
+      minScore: 1.0,
+    });
+    const results = response.results ?? [];
+    assertEquals(results.length, 1);
+    assertEquals(results[0].score, 1.0);
+  } finally {
+    await dispose();
+  }
+});
+
 Deno.test("CloudflareSearchIndex - pure punctuation query returns no results", async () => {
   const { searchIndex, dispose } = await createTestContext();
   try {

@@ -1,25 +1,17 @@
-import type {
-  ReindexRequest,
-  ReindexResponse,
-  SearchIndexInterface,
-  SearchRequest,
-  SearchResponse,
-  SearchResult,
+import {
+  normalizeRrfScore,
+  type ReindexRequest,
+  type ReindexResponse,
+  type SearchIndexInterface,
+  type SearchRequest,
+  type SearchResponse,
+  type SearchResult,
 } from "@worlds/sdk/search-index";
 import { buildSearchResultId } from "@worlds/sqlite/sql-core";
 import type { D1ClientBaseOptions } from "@/cloudflare/d1-client-base-options.ts";
 import type { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
 import type { D1SearchQueryBuilder } from "./d1-search-query-builder.ts";
 import { rebuildD1SearchIndexFromQuads } from "./rebuild-d1-search-index-from-quads.ts";
-
-/**
- * SearchRequestWithProfile extends SearchRequest with memory profile overrides for topK and minScore.
- * These fields will be added to the upstream SearchRequest interface in a future release.
- */
-interface SearchRequestWithProfile extends SearchRequest {
-  topK?: number;
-  minScore?: number;
-}
 
 /**
  * CloudflareSearchIndexOptions defines the structured configuration and dependency parameters needed to construct the Cloudflare D1 search engine.
@@ -30,6 +22,15 @@ export interface CloudflareSearchIndexOptions extends D1ClientBaseOptions {
 
   /** searchQueryBuilder must match the schema and commit path used when materializing chunk vectors. */
   searchQueryBuilder: D1SearchQueryBuilder;
+
+  /**
+   * candidateCount sizes the internal candidate pool at the SQL level — the
+   * number of ranked hits fetched before normalization and post-ranking
+   * minScore filtering. Provider-internal per the hosted search contract
+   * (worlds-api#30 D2); callers pass `max(limit, world.topK)`. Defaults to
+   * `limit` (100).
+   */
+  candidateCount?: number;
 
   /** limit establishes optional page sizing constraints for search result sets, defaulting to 100. */
   limit?: number;
@@ -63,23 +64,30 @@ export class CloudflareSearchIndex implements SearchIndexInterface {
       );
     }
 
-    const profileRequest = request as SearchRequestWithProfile;
-    const searchLimit = profileRequest.topK ?? this.options.limit ?? 100;
+    // Provider-internal candidate pool: the SQL window that gets ranked before
+    // normalization and post-ranking minScore filtering. `topK` is no longer a
+    // per-request override per the hosted search contract (worlds-api#30 D1).
+    const candidateCount = this.options.candidateCount ??
+      this.options.limit ?? 100;
 
     const { sql, args } = this.options.searchQueryBuilder.buildSearchQuery(
       request,
       {
-        limit: searchLimit,
+        limit: candidateCount,
       },
     );
 
     const resultSet = await this.options.connection.execute({ sql, args });
 
-    const minScore = profileRequest.minScore ?? 0;
+    const minScore = request.minScore ?? 0;
     const results: SearchResult[] = [];
 
-    for (const row of resultSet.rows) {
-      const score = Number(row["combined_rank"]);
+    // Rows arrive ordered by combined_rank DESC (best first), so the 0-based
+    // row position is the rrf rank. Normalize to the contract [0, 1] scale
+    // (score = k/(k+rank), rank 0 → 1.0) so minScore is a meaningful floor.
+    for (let rowIndex = 0; rowIndex < resultSet.rows.length; rowIndex++) {
+      const row = resultSet.rows[rowIndex];
+      const score = normalizeRrfScore(rowIndex);
       if (score < minScore) continue;
 
       const searchResultBase = {
@@ -92,6 +100,7 @@ export class CloudflareSearchIndex implements SearchIndexInterface {
         id: await buildSearchResultId(searchResultBase),
         ...searchResultBase,
         score,
+        scoreType: "rrf",
       });
     }
 
