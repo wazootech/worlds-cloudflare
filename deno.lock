@@ -6,13 +6,11 @@
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@wazoo/sparql-engine@~0.4.1": "0.4.1",
     "jsr:@worlds/sdk@0.6": "0.6.1",
-    "jsr:@worlds/sdk@~0.6.1": "0.6.1",
+    "jsr:@worlds/sdk@~0.8.1": "0.8.1",
     "jsr:@worlds/sqlite@0.6": "0.6.0",
     "npm:@langchain/textsplitters@^1.0.1": "1.0.1_@langchain+core@1.2.9",
     "npm:@rdfjs/types@^2.0.1": "2.0.1",
-    "npm:ai@^6.0.195": "6.0.264_zod@4.4.3",
-    "npm:miniflare@^4.20260730.0": "4.20260730.0",
-    "npm:sqlite-vec@~0.1.9": "0.1.9"
+    "npm:miniflare@^4.20260730.0": "4.20260730.0"
   },
   "jsr": {
     "@std/assert@1.0.19": {
@@ -38,47 +36,26 @@
       "dependencies": [
         "jsr:@std/encoding",
         "jsr:@wazoo/sparql-engine",
-        "npm:@rdfjs/types",
-        "npm:ai"
+        "npm:@rdfjs/types"
+      ]
+    },
+    "@worlds/sdk@0.8.1": {
+      "integrity": "6012a655bd40aed4770b700953bc9e2f5b06443398679fc6aa9cb595ee80b99f",
+      "dependencies": [
+        "jsr:@std/encoding",
+        "jsr:@wazoo/sparql-engine",
+        "npm:@rdfjs/types"
       ]
     },
     "@worlds/sqlite@0.6.0": {
       "integrity": "3b5210b0b9e1c4926f7caa6f28e1b492a680228c61d3da36d4af2ae3508abf95",
       "dependencies": [
         "jsr:@wazoo/sparql-engine",
-        "jsr:@worlds/sdk@0.6",
-        "npm:@langchain/textsplitters",
-        "npm:@rdfjs/types",
-        "npm:sqlite-vec"
+        "jsr:@worlds/sdk@0.6"
       ]
     }
   },
   "npm": {
-    "@ai-sdk/gateway@3.0.179_zod@4.4.3": {
-      "integrity": "sha512-UauCMcauBgcYNljb7RP4HEuUZj3dlk/yz0oOHdhGr3cXoe+uwwN9qwQlLlB2hnajXudSatI2xpPG8LiHPRgwLQ==",
-      "dependencies": [
-        "@ai-sdk/provider",
-        "@ai-sdk/provider-utils",
-        "@vercel/oidc",
-        "zod"
-      ]
-    },
-    "@ai-sdk/provider-utils@4.0.46_zod@4.4.3": {
-      "integrity": "sha512-tEtld97plCFiYevsJuOkGkeuhQndeMWFBVrJS4AjnbD5AqrNSXRCe0p+BZ3Cju/sxDeeZ9ym3q9YUV8fASA7aQ==",
-      "dependencies": [
-        "@ai-sdk/provider",
-        "@standard-schema/spec",
-        "eventsource-parser",
-        "undici@6.28.0",
-        "zod"
-      ]
-    },
-    "@ai-sdk/provider@3.0.15": {
-      "integrity": "sha512-XeZW1CcDF2GMbH4wejW6xBRI2QCOgnkVYUnxoeDadB1mf85riL2bMUeDoh+6gJ/r4mjNfzUPW8OjLjvwTP0u1Q==",
-      "dependencies": [
-        "json-schema"
-      ]
-    },
     "@cfworker/json-schema@4.1.1": {
       "integrity": "sha512-gAmrUZSGtKc3AiBL71iNWxDsyUC5uMaKKGdvzYsBoTW/xi42JQHl7eKV2OYzCUqvc+D2RCcf7EXY2iCyFIk6og=="
     },
@@ -319,9 +296,6 @@
         "js-tiktoken"
       ]
     },
-    "@opentelemetry/api@1.9.1": {
-      "integrity": "sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q=="
-    },
     "@poppinss/colors@4.1.6": {
       "integrity": "sha512-H9xkIdFswbS8n1d6vmRd8+c10t2Qe+rZITbbDHHkQixH5+2x1FDGmi/0K+WgWiqQFKPSlIYB7jlH6Kpfn6Fleg==",
       "dependencies": [
@@ -354,23 +328,10 @@
     "@standard-schema/spec@1.1.0": {
       "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="
     },
-    "@types/node@26.2.0": {
-      "integrity": "sha512-5IviulTZeRNp2vAJ514cc/HUlY5nZ9fCbq9DMyC52BrhFZACo3nI0R7qBxhQmo/d27NFe96ur/b7Wwxklda+kg==",
+    "@types/node@26.4.0": {
+      "integrity": "sha512-faiGnoIrLH/V8cibOMEAZ8pMw6oXqSukl29ra4mN8GdaB2ZewzeaLj+INpV5N+Z1eKWzY+IzaIZH2EIR6YZRNQ==",
       "dependencies": [
         "undici-types"
-      ]
-    },
-    "@vercel/oidc@3.2.0": {
-      "integrity": "sha512-UycprH3T6n3jH0k44NHMa7pnFHGu/N05MjojYr+Mc6I7obkoLIJujSWwin1pCvdy/eOxrI/l3uDLQsmcrOb4ug=="
-    },
-    "ai@6.0.264_zod@4.4.3": {
-      "integrity": "sha512-te59gArDNXoQYWuOkZNdM7n3McETAPWFuwT/iKWRJXySV/doIuKm8Az4X6IOalaGp3K8zqGT/ICn08z5ZZNDuw==",
-      "dependencies": [
-        "@ai-sdk/gateway",
-        "@ai-sdk/provider",
-        "@ai-sdk/provider-utils",
-        "@opentelemetry/api",
-        "zod"
       ]
     },
     "base64-js@1.5.1": {
@@ -388,17 +349,11 @@
     "eventemitter3@4.0.7": {
       "integrity": "sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw=="
     },
-    "eventsource-parser@3.1.1": {
-      "integrity": "sha512-EKN1vKAMcZ8MlYMpaNuxN6R9yakzH6uajHcHVTqWJzvu5pWw9DyhbP35HH8MVBQ+dZjAfDxk+A8NiR9KWaXiyQ=="
-    },
     "js-tiktoken@1.0.21": {
       "integrity": "sha512-biOj/6M5qdgx5TKjDnFT1ymSpM5tbd3ylwDtrQvFQSu0Z7bBYko2dF+W/aUkXUPuk6IVpRxk/3Q2sHOzGlS36g==",
       "dependencies": [
         "base64-js"
       ]
-    },
-    "json-schema@0.4.0": {
-      "integrity": "sha512-es94M3nTIfsEPisRafak+HDLfHXnKBhV3vU5eqPcS3flIWqcxJWgXHXiey3YrpaNsanY5ei1VoYEbOzijuq9BA=="
     },
     "kleur@4.1.5": {
       "integrity": "sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ=="
@@ -414,7 +369,7 @@
       "dependencies": [
         "@cspotcode/source-map-support",
         "sharp",
-        "undici@7.28.0",
+        "undici",
         "workerd",
         "ws",
         "youch"
@@ -480,41 +435,6 @@
         "@img/sharp-win32-x64"
       ]
     },
-    "sqlite-vec-darwin-arm64@0.1.9": {
-      "integrity": "sha512-jSsZpE42OfBkGL/ItyJTVCUwl6o6Ka3U5rc4j+UBDIQzC1ulSSKMEhQLthsOnF/MdAf1MuAkYhkdKmmcjaIZQg==",
-      "os": ["darwin"],
-      "cpu": ["arm64"]
-    },
-    "sqlite-vec-darwin-x64@0.1.9": {
-      "integrity": "sha512-KDlVyqQT7pnOhU1ymB9gs7dMbSoVmKHitT+k1/xkjarcX8bBqPxWrGlK/R+C5WmWkfvWwyq5FfXfiBYCBs6PlA==",
-      "os": ["darwin"],
-      "cpu": ["x64"]
-    },
-    "sqlite-vec-linux-arm64@0.1.9": {
-      "integrity": "sha512-5wXVJ9c9kR4CHm/wVqXb/R+XUHTdpZ4nWbPHlS+gc9qQFVHs92Km4bPnCKX4rtcPMzvNis+SIzMJR1SCEwpuUw==",
-      "os": ["linux"],
-      "cpu": ["arm64"]
-    },
-    "sqlite-vec-linux-x64@0.1.9": {
-      "integrity": "sha512-w3tCH8xK2finW8fQJ/m8uqKodXUZ9KAuAar2UIhz4BHILfpE0WM/MTGCRfa7RjYbrYim5Luk3guvMOGI7T7JQA==",
-      "os": ["linux"],
-      "cpu": ["x64"]
-    },
-    "sqlite-vec-windows-x64@0.1.9": {
-      "integrity": "sha512-y3gEIyy/17bq2QFPQOWLE68TYWcRZkBQVA2XLrTPHNTOp55xJi/BBBmOm40tVMDMjtP+Elpk6UBUXdaq+46b0Q==",
-      "os": ["win32"],
-      "cpu": ["x64"]
-    },
-    "sqlite-vec@0.1.9": {
-      "integrity": "sha512-L7XJWRIBNvR9O5+vh1FQ+IGkh/3D2AzVksW5gdtk28m78Hy8skFD0pqReKH1Yp0/BUKRGcffgKvyO/EON5JXpA==",
-      "optionalDependencies": [
-        "sqlite-vec-darwin-arm64",
-        "sqlite-vec-darwin-x64",
-        "sqlite-vec-linux-arm64",
-        "sqlite-vec-linux-x64",
-        "sqlite-vec-windows-x64"
-      ]
-    },
     "supports-color@10.2.2": {
       "integrity": "sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g=="
     },
@@ -523,9 +443,6 @@
     },
     "undici-types@8.3.0": {
       "integrity": "sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ=="
-    },
-    "undici@6.28.0": {
-      "integrity": "sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA=="
     },
     "undici@7.28.0": {
       "integrity": "sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA=="
@@ -570,7 +487,7 @@
     "dependencies": [
       "jsr:@std/assert@^1.0.19",
       "jsr:@wazoo/sparql-engine@~0.4.1",
-      "jsr:@worlds/sdk@~0.6.1",
+      "jsr:@worlds/sdk@~0.8.1",
       "jsr:@worlds/sqlite@0.6",
       "npm:@langchain/textsplitters@^1.0.1",
       "npm:@rdfjs/types@^2.0.1",
