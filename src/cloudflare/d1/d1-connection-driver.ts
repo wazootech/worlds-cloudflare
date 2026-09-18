@@ -43,17 +43,17 @@ export interface D1Result<Row = Record<string, unknown>> {
  * sequence on any failure.
  */
 export interface D1ConnectionDriverOptions {
-  worldUid?: string;
+  worldId?: string;
 }
 
 export class D1ConnectionDriver {
-  public readonly worldUid?: string;
+  public readonly worldId?: string;
 
   public constructor(
     private readonly database: D1DatabaseLike,
     options?: D1ConnectionDriverOptions,
   ) {
-    this.worldUid = options?.worldUid;
+    this.worldId = options?.worldId;
   }
 
   /**

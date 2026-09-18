@@ -24,8 +24,8 @@ export interface CloudflareWorldsSdkOptions extends D1ClientBaseOptions {
   /** database is the raw D1 binding (miniflare or a real Worker binding). */
   database: D1DatabaseLike;
 
-  /** worldUid scopes all quad and search-index operations when provided. */
-  worldUid?: string;
+  /** worldId scopes all quad and search-index operations when provided. */
+  worldId?: string;
 
   /**
    * candidateCount sizes the search-index candidate pool at the SQL level
@@ -37,7 +37,7 @@ export interface CloudflareWorldsSdkOptions extends D1ClientBaseOptions {
 
   /**
    * vectorize is the Cloudflare Vectorize binding for the outside-D1 vector
-   * index (Phase C, worlds-api#1). The index must register `world_uid` as a
+   * index (Phase C, worlds-api#1). The index must register `world_id` as a
    * filterable metadata property. When set (with an embeddingService), imports
    * populate vectors and searches fuse keyword + vector rankings.
    */
@@ -56,13 +56,13 @@ export async function createCloudflareWorldsSdk(
 ): Promise<WorldsSdkInterface> {
   const vectorDimensions = options.vectorDimensions ?? 1536;
   const connection = new D1ConnectionDriver(options.database, {
-    worldUid: options.worldUid,
+    worldId: options.worldId,
   });
   const schema = new D1SchemaBuilder(vectorDimensions, {
-    worldUid: options.worldUid,
+    worldId: options.worldId,
   });
   const searchQuery = new D1SearchQueryBuilder(vectorDimensions, {
-    worldUid: options.worldUid,
+    worldId: options.worldId,
   });
 
   const d1RdfjsStore = new D1RdfjsStore({
@@ -71,7 +71,7 @@ export async function createCloudflareWorldsSdk(
     maxLookupChunkSize: options.maxLookupChunkSize,
     maxWriteBatchSize: options.maxWriteBatchSize,
     schemaBuilder: schema,
-    worldUid: options.worldUid,
+    worldId: options.worldId,
   });
 
   await d1RdfjsStore.ensureSchema();
@@ -82,7 +82,7 @@ export async function createCloudflareWorldsSdk(
   const vectorSearch = options.vectorize
     ? new VectorizeVectorSearchIndex({
       index: options.vectorize,
-      worldUid: options.worldUid,
+      worldId: options.worldId,
     })
     : undefined;
 

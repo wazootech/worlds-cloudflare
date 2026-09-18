@@ -11,7 +11,7 @@ export interface D1SchemaCompatibilityReport {
   schemaVersion: number | null;
 }
 
-export const D1_DATA_PLANE_SCHEMA_VERSION = 1;
+export const D1_DATA_PLANE_SCHEMA_VERSION = 2;
 const SCHEMA_VERSION_TABLE = "worlds_data_plane_schema";
 
 const REQUIRED_COLUMNS: Record<string, string[]> = {
@@ -42,7 +42,7 @@ const REQUIRED_COLUMNS: Record<string, string[]> = {
 /** Inspect the actual D1 schema and report missing required tables or columns. */
 export async function checkD1SchemaCompatibility(
   connection: D1ConnectionDriver,
-  options: { worldUid?: string } = {},
+  options: { worldId?: string } = {},
 ): Promise<D1SchemaCompatibilityReport> {
   const issues: D1SchemaCompatibilityIssue[] = [];
   let schemaVersion: number | null = null;
@@ -75,7 +75,7 @@ export async function checkD1SchemaCompatibility(
   const requiredColumns = Object.fromEntries(
     Object.entries(REQUIRED_COLUMNS).map(([table, columns]) => [
       table,
-      options.worldUid ? [...columns, "world_uid"] : columns,
+      options.worldId ? [...columns, "world_id"] : columns,
     ]),
   );
   for (const [table, columns] of Object.entries(requiredColumns)) {
@@ -104,7 +104,7 @@ export async function checkD1SchemaCompatibility(
 /** Validate the schema and throw an actionable error before serving traffic. */
 export async function assertD1SchemaCompatible(
   connection: D1ConnectionDriver,
-  options: { worldUid?: string } = {},
+  options: { worldId?: string } = {},
 ): Promise<void> {
   const report = await checkD1SchemaCompatibility(connection, options);
   if (!report.compatible) {

@@ -18,7 +18,10 @@ import { DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE } from "@/cloudflare/d1/d1-batch-execu
 import { DEFAULT_D1_MAX_WRITE_BATCH_SIZE } from "@/cloudflare/d1/d1-batch-executor.ts";
 import { quadFromD1Row, quadToInsertRow } from "@/cloudflare/d1/d1-quad-row.ts";
 import { D1SchemaBuilder } from "@/cloudflare/schema/d1-schema-builder.ts";
-import { assertD1SchemaCompatible } from "@/cloudflare/schema/d1-schema-compatibility.ts";
+import {
+  assertD1SchemaCompatible,
+  D1_DATA_PLANE_SCHEMA_VERSION,
+} from "@/cloudflare/schema/d1-schema-compatibility.ts";
 import { D1QuadStream } from "./d1-quad-stream.ts";
 
 /**
@@ -40,8 +43,8 @@ export interface D1RdfjsStoreOptions {
   /** schemaBuilder supplies the DDL the store applies in ensureSchema(). */
   schemaBuilder?: D1SchemaBuilder;
 
-  /** worldUid scopes all reads and writes when schema has a world_uid column. */
-  worldUid?: string;
+  /** worldId scopes all reads and writes when schema has a world_id column. */
+  worldId?: string;
 }
 
 /**
@@ -144,7 +147,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
   private readonly writeBatchSize: number;
   private readonly lookupChunkSize: number;
   private readonly schemaBuilder: D1SchemaBuilder;
-  private readonly worldUid?: string;
+  private readonly worldId?: string;
   /** serialized write queue: every mutation runs after the previous one. */
   private mutationQueue: Promise<void> = Promise.resolve();
   /** synchronous size approximation, refreshed after every write. */
@@ -158,8 +161,8 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     this.lookupChunkSize = options.maxLookupChunkSize ??
       DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE;
     this.schemaBuilder = options.schemaBuilder ??
-      new D1SchemaBuilder(32, { worldUid: options.worldUid });
-    this.worldUid = options.worldUid;
+      new D1SchemaBuilder(32, { worldId: options.worldId });
+    this.worldId = options.worldId;
   }
 
   /**
@@ -191,20 +194,48 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
         "INSERT OR IGNORE INTO worlds_data_plane_schema (version) VALUES (?)",
       args: [1],
     });
-    if (this.worldUid) {
+    if (this.worldId) {
+      await this.migrateWorldIdColumns();
       await assertD1SchemaCompatible(this.connection, {
-        worldUid: this.worldUid,
+        worldId: this.worldId,
       });
     }
     await this.refreshCount();
   }
 
+  /**
+   * migrateWorldIdColumns upgrades a legacy v1 data plane in place: databases
+   * created under the pre-canonical schema carry a `world_uid` column on the
+   * `quads` and `chunks` tables. These are renamed to `world_id` (D1 supports
+   * ALTER TABLE ... RENAME COLUMN) and the schema version is recorded as v2 so
+   * the compatibility assertion below runs against the canonical shape.
+   * Fresh databases never hit the rename branch (they already emit `world_id`).
+   */
+  private async migrateWorldIdColumns(): Promise<void> {
+    for (const table of ["quads", "chunks"]) {
+      const columnResult = await this.connection.execute<{ name: string }>({
+        sql: `PRAGMA table_info(${table})`,
+      });
+      const columns = new Set(columnResult.rows.map((row) => row.name));
+      if (columns.has("world_uid") && !columns.has("world_id")) {
+        await this.connection.execute({
+          sql: `ALTER TABLE ${table} RENAME COLUMN world_uid TO world_id`,
+        });
+      }
+    }
+    await this.connection.execute({
+      sql:
+        "INSERT OR IGNORE INTO worlds_data_plane_schema (version) VALUES (?)",
+      args: [D1_DATA_PLANE_SCHEMA_VERSION],
+    });
+  }
+
   private async refreshCount(): Promise<void> {
     const result = await this.connection.execute<{ count: number }>({
-      sql: this.worldUid
-        ? "SELECT COUNT(*) AS count FROM quads WHERE world_uid = ?"
+      sql: this.worldId
+        ? "SELECT COUNT(*) AS count FROM quads WHERE world_id = ?"
         : "SELECT COUNT(*) AS count FROM quads",
-      args: this.worldUid ? [this.worldUid] : [],
+      args: this.worldId ? [this.worldId] : [],
     });
     this.liveCount = Number(result.rows[0]?.count ?? 0);
   }
@@ -248,7 +279,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       });
 
       if (isReplaceImportCommit(context)) {
-        await executor.stage(buildWipeAllGraphDataStatements(this.worldUid));
+        await executor.stage(buildWipeAllGraphDataStatements(this.worldId));
       }
 
       const targetedDeletions = patch.deletions ?? [];
@@ -260,7 +291,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
           executor,
           deletionIds,
           this.lookupChunkSize,
-          (chunk) => [buildDeleteQuadsByQuadIds(chunk, this.worldUid)],
+          (chunk) => [buildDeleteQuadsByQuadIds(chunk, this.worldId)],
         );
       }
 
@@ -270,7 +301,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
           this.connection,
           proposedIds,
           this.lookupChunkSize,
-          this.worldUid,
+          this.worldId,
         );
 
         const novelRows: InsertQuadRow[] = [];
@@ -284,7 +315,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
         if (novelRows.length > 0) {
           await executor.stage(
             buildBulkInsertQuads(
-              novelRows.map((row) => ({ ...row, world_uid: this.worldUid })),
+              novelRows.map((row) => ({ ...row, world_id: this.worldId })),
             ),
           );
         }
@@ -329,7 +360,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       await this.connection.batch(
         buildBulkInsertQuads([{
           ...(await quadToInsertRow(quad)),
-          world_uid: this.worldUid,
+          world_id: this.worldId,
         }]),
       );
     });
@@ -340,7 +371,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     void this.enqueueWrite(async () => {
       const [id] = await hashQuads([quad]);
       await this.connection.batch([
-        buildDeleteQuadsByQuadIds([id], this.worldUid),
+        buildDeleteQuadsByQuadIds([id], this.worldId),
       ]);
     });
     return this;
@@ -390,7 +421,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       const { sql, args } = buildMatchQuadsQuery(
         pattern,
         { afterQuadId, limit: this.matchPageSize },
-        this.worldUid,
+        this.worldId,
       );
       const result = await this.connection.execute<Record<string, unknown>>({
         sql,
@@ -438,7 +469,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       predicate: predicate ?? null,
       object: object ?? null,
       graph: graph ?? null,
-    }, this.worldUid);
+    }, this.worldId);
     const result = await this.connection.execute<{ count: number }>({
       sql,
       args,
@@ -514,13 +545,13 @@ async function queryCachePresence(
   connection: D1ConnectionDriver,
   quadIds: string[],
   lookupChunkSize: number,
-  worldUid?: string,
+  worldId?: string,
 ): Promise<Set<string>> {
   const cachedIds = new Set<string>();
   for (let index = 0; index < quadIds.length; index += lookupChunkSize) {
     const chunk = quadIds.slice(index, index + lookupChunkSize);
     const result = await connection.execute(
-      buildSelectExistingQuadIds(chunk, worldUid),
+      buildSelectExistingQuadIds(chunk, worldId),
     );
     for (const row of result.rows) {
       if (row.id) {

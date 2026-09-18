@@ -10,7 +10,7 @@ import type {
  * VectorizeVectorSearchIndex implements VectorSearchIndex over a Cloudflare
  * Vectorize binding.
  *
- * The underlying index must be provisioned with `world_uid` registered as a
+ * The underlying index must be provisioned with `world_id` registered as a
  * filterable metadata property (wrangler `vectorize create` with a metadata
  * index config) so per-world scoping works at query time.
  */
@@ -18,8 +18,8 @@ export class VectorizeVectorSearchIndex implements VectorSearchIndex {
   public constructor(
     private readonly options: {
       index: VectorizeIndexLike;
-      /** worldUid scopes queries via the world_uid metadata filter. */
-      worldUid?: string;
+      /** worldId scopes queries via the world_id metadata filter. */
+      worldId?: string;
     },
   ) {}
 
@@ -28,9 +28,7 @@ export class VectorizeVectorSearchIndex implements VectorSearchIndex {
     options: VectorSearchQueryOptions,
   ): Promise<VectorSearchHit[]> {
     const filter = options.filter ??
-      (this.options.worldUid
-        ? { world_uid: this.options.worldUid }
-        : undefined);
+      (this.options.worldId ? { world_id: this.options.worldId } : undefined);
 
     const result = await this.options.index.query(vector, {
       topK: options.topK,

@@ -9,16 +9,16 @@ const worldB = "world-b";
 
 const source = (value: string) => `<urn:alice> <urn:name> "${value}" .\n`;
 
-Deno.test("worldUid isolates select, delete, update, import, reindex, and search", async () => {
+Deno.test("worldId isolates select, delete, update, import, reindex, and search", async () => {
   const substrate = await createTestD1();
   try {
     const sdkA = await createCloudflareWorldsSdk({
       database: substrate.database,
-      worldUid: worldA,
+      worldId: worldA,
     });
     const sdkB = await createCloudflareWorldsSdk({
       database: substrate.database,
-      worldUid: worldB,
+      worldId: worldB,
     });
 
     await sdkA.import({
@@ -68,16 +68,16 @@ Deno.test("worldUid isolates select, delete, update, import, reindex, and search
   }
 });
 
-Deno.test("worldUid serializes concurrent writes without cross-world leakage", async () => {
+Deno.test("worldId serializes concurrent writes without cross-world leakage", async () => {
   const substrate = await createTestD1();
   try {
     const sdkA = await createCloudflareWorldsSdk({
       database: substrate.database,
-      worldUid: worldA,
+      worldId: worldA,
     });
     const sdkB = await createCloudflareWorldsSdk({
       database: substrate.database,
-      worldUid: worldB,
+      worldId: worldB,
     });
 
     await Promise.all([
@@ -110,9 +110,9 @@ Deno.test("worldUid serializes concurrent writes without cross-world leakage", a
     assertEquals(await count(sdkB), 1);
 
     const raw = await substrate.database.prepare(
-      "SELECT world_uid, COUNT(*) AS count FROM quads GROUP BY world_uid ORDER BY world_uid",
-    ).all<{ world_uid: string; count: number }>();
-    assertEquals(raw.results.map((row) => [row.world_uid, Number(row.count)]), [
+      "SELECT world_id, COUNT(*) AS count FROM quads GROUP BY world_id ORDER BY world_id",
+    ).all<{ world_id: string; count: number }>();
+    assertEquals(raw.results.map((row) => [row.world_id, Number(row.count)]), [
       [worldA, 1],
       [worldB, 1],
     ]);
