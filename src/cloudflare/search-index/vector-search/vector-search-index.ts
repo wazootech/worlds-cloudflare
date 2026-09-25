@@ -13,7 +13,7 @@ export interface VectorSearchEntry {
   /** Embedded chunk vector; must match the index dimensions. */
   vector: Float32Array;
   /**
-   * Metadata used for filtering and result rendering. `world_uid` must be
+   * Metadata used for filtering and result rendering. `world_id` must be
    * present for per-world scoping (the hosted index registers it as a
    * filterable property at creation time).
    */
@@ -25,7 +25,7 @@ export interface VectorSearchHit {
   id: string;
   /** Cosine similarity in [-1, 1]; consumers clamp to the [0, 1] contract scale. */
   score: number;
-  /** The entry metadata (subject/predicate/graph/value + world_uid). */
+  /** The entry metadata (subject/predicate/graph/value + world_id). */
   metadata?: Record<string, string>;
 }
 
@@ -33,7 +33,7 @@ export interface VectorSearchQueryOptions {
   /** Maximum number of nearest neighbors to return. */
   topK: number;
   /**
-   * Exact-match metadata filter (e.g. `{ world_uid }`). The Cloudflare
+   * Exact-match metadata filter (e.g. `{ world_id }`). The Cloudflare
    * binding only supports properties registered as filterable on the index.
    */
   filter?: Record<string, string>;

@@ -34,12 +34,12 @@ const D1_SEARCH_QUERY_BUILDER_MAX_VECTOR_DIMENSIONS = 1536;
  * store the F32_BLOB width for future Vectorize sync.
  */
 export interface D1SearchQueryBuilderOptions {
-  worldUid?: string;
+  worldId?: string;
 }
 
 export class D1SearchQueryBuilder {
   public readonly vectorDimensions: number;
-  public readonly worldUid?: string;
+  public readonly worldId?: string;
 
   public constructor(
     vectorDimensions: number,
@@ -58,7 +58,7 @@ export class D1SearchQueryBuilder {
       );
     }
     this.vectorDimensions = dimensions;
-    this.worldUid = options?.worldUid;
+    this.worldId = options?.worldId;
   }
 
   public buildInsertChunk(insertOptions: {
@@ -69,7 +69,7 @@ export class D1SearchQueryBuilder {
     value: string;
     fts_value: string;
     vector?: Float32Array | null;
-    world_uid?: string;
+    world_id?: string;
   }): SqlStatement {
     const args: (string | number | Uint8Array | null)[] = [
       insertOptions.quad_id,
@@ -84,13 +84,13 @@ export class D1SearchQueryBuilder {
     } else {
       args.push(null);
     }
-    if (this.worldUid) args.push(insertOptions.world_uid ?? this.worldUid);
+    if (this.worldId) args.push(insertOptions.world_id ?? this.worldId);
     return {
       sql:
         `INSERT INTO chunks (quad_id, subject, predicate, graph, value, fts_value, vector${
-          this.worldUid ? ", world_uid" : ""
+          this.worldId ? ", world_id" : ""
         })
-          VALUES (?, ?, ?, ?, ?, ?, ?${this.worldUid ? ", ?" : ""})`,
+          VALUES (?, ?, ?, ?, ?, ?, ?${this.worldId ? ", ?" : ""})`,
       args,
     };
   }
@@ -101,9 +101,9 @@ export class D1SearchQueryBuilder {
     const placeholders = generatePlaceholders(quadIds.length);
     return {
       sql: `DELETE FROM chunks WHERE quad_id IN (${placeholders})${
-        this.worldUid ? " AND world_uid = ?" : ""
+        this.worldId ? " AND world_id = ?" : ""
       }`,
-      args: this.worldUid ? [...quadIds, this.worldUid] : quadIds,
+      args: this.worldId ? [...quadIds, this.worldId] : quadIds,
     };
   }
 
@@ -120,9 +120,9 @@ export class D1SearchQueryBuilder {
     return {
       sql:
         `SELECT quad_id, subject, predicate, graph, value FROM chunks WHERE quad_id IN (${placeholders})${
-          this.worldUid ? " AND world_uid = ?" : ""
+          this.worldId ? " AND world_id = ?" : ""
         }`,
-      args: this.worldUid ? [...quadIds, this.worldUid] : quadIds,
+      args: this.worldId ? [...quadIds, this.worldId] : quadIds,
     };
   }
 
@@ -140,9 +140,9 @@ export class D1SearchQueryBuilder {
       request,
       CHUNKS_TABLE_COLUMNS,
     );
-    if (this.worldUid) {
-      whereClauses.push("chunks.world_uid = ?");
-      filterArgs.push(this.worldUid);
+    if (this.worldId) {
+      whereClauses.push("chunks.world_id = ?");
+      filterArgs.push(this.worldId);
     }
 
     const whereFilter = whereClauses.length > 0

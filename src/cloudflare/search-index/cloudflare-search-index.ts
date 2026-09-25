@@ -25,8 +25,8 @@ export interface CloudflareSearchIndexOptions extends D1ClientBaseOptions {
   /** connection is the D1ConnectionDriver wrapping the D1 binding. */
   connection: D1ConnectionDriver;
 
-  /** worldUid scopes the vector query via the world_uid metadata filter. */
-  worldUid?: string;
+  /** worldId scopes the vector query via the world_id metadata filter. */
+  worldId?: string;
 
   /** searchQueryBuilder must match the schema and commit path used when materializing chunk vectors. */
   searchQueryBuilder: D1SearchQueryBuilder;
@@ -138,8 +138,8 @@ export class CloudflareSearchIndex implements SearchIndexInterface {
             Array.from(queryVector),
             {
               topK: candidateCount,
-              ...(this.options.worldUid
-                ? { filter: { world_uid: this.options.worldUid } }
+              ...(this.options.worldId
+                ? { filter: { world_id: this.options.worldId } }
                 : {}),
             },
           );

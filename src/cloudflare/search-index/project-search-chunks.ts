@@ -32,7 +32,7 @@ export interface ProjectSearchChunksOptions extends D1ClientBaseOptions {
    */
   vectorSearch?: import("./vector-search/mod.ts").VectorSearchIndex;
 
-  worldUid?: string;
+  worldId?: string;
 }
 
 /**
@@ -186,7 +186,7 @@ async function buildChunkStatements(
         value: chunk.value,
         fts_value,
         vector,
-        world_uid: options.worldUid,
+        world_id: options.worldId,
       }),
     );
 
@@ -200,7 +200,7 @@ async function buildChunkStatements(
         }),
         vector,
         metadata: {
-          ...(options.worldUid ? { world_uid: options.worldUid } : {}),
+          ...(options.worldId ? { world_id: options.worldId } : {}),
           subject: chunk.subject,
           predicate: chunk.predicate,
           graph: chunk.graph,

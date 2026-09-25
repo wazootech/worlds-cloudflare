@@ -241,13 +241,13 @@ Deno.test("PhaseC - vector search is scoped per world via the metadata filter", 
   try {
     const store = new D1RdfjsStore({
       connection: substrate.connection,
-      worldUid: "w-one",
+      worldId: "w-one",
     });
     await store.ensureSchema();
     // The builder must be world-scoped like createCloudflareWorldsSdk wires it
-    // (its worldUid gates the world_uid column on chunk writes and queries).
+    // (its worldId gates the world_id column on chunk writes and queries).
     const searchQueryBuilder = new D1SearchQueryBuilder(32, {
-      worldUid: "w-one",
+      worldId: "w-one",
     });
     const textSplitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
@@ -260,7 +260,7 @@ Deno.test("PhaseC - vector search is scoped per world via the metadata filter", 
       textSplitter,
       embeddingService,
       vectorSearch,
-      worldUid: "w-one",
+      worldId: "w-one",
     });
     const quadStore = new D1QuadStore({
       connection: substrate.connection,
@@ -268,7 +268,7 @@ Deno.test("PhaseC - vector search is scoped per world via the metadata filter", 
       searchQueryBuilder,
       searchIndexProjector: projector,
       searchIndexOnImport: "incremental",
-      worldUid: "w-one",
+      worldId: "w-one",
     });
     const searchIndex = new CloudflareSearchIndex({
       connection: substrate.connection,
@@ -276,7 +276,7 @@ Deno.test("PhaseC - vector search is scoped per world via the metadata filter", 
       textSplitter,
       embeddingService,
       vectorSearch,
-      worldUid: "w-one",
+      worldId: "w-one",
     });
 
     await quadStore.import({
@@ -328,7 +328,7 @@ Deno.test("PhaseC - vector search is scoped per world via the metadata filter", 
         0,
         0,
       ]),
-      metadata: { world_uid: "w-two", subject: "urn:other-world" },
+      metadata: { world_id: "w-two", subject: "urn:other-world" },
     }]);
 
     const response = await searchIndex.search({ query: "alpha" });

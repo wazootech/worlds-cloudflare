@@ -54,7 +54,7 @@ export async function rebuildD1SearchIndexFromQuads(
     const query = buildMatchQuadsQuery(
       { subject: null, predicate: null, object: null, graph: null },
       { afterQuadId, limit: pageSize },
-      searchQueryBuilder.worldUid,
+      searchQueryBuilder.worldId,
     );
     const resultSet = await connection.execute(query);
 

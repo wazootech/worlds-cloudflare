@@ -42,8 +42,8 @@ export interface D1QuadStoreOptions extends D1ClientBaseOptions {
   /** maxWriteBatchSize caps how many statements are sent per D1 write batch. Defaults to 500. */
   maxWriteBatchSize?: number;
 
-  /** worldUid scopes all quad and search-index operations. */
-  worldUid?: string;
+  /** worldId scopes all quad and search-index operations. */
+  worldId?: string;
 }
 
 /**
@@ -93,7 +93,7 @@ export class D1QuadStore implements QuadStoreInterface {
 
         const { novelInsertions, novelQuadIds } = await commitPatchToD1(
           patch,
-          { ...this.options, worldUid: this.options.worldUid },
+          { ...this.options, worldId: this.options.worldId },
           context,
         );
 
