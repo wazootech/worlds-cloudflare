@@ -129,7 +129,7 @@ Deno.test("D1 schema compatibility migrates a legacy v1 world_uid schema to worl
     // Seed legacy v1 rows so the rename proves data preservation, not just
     // the resulting column names. Two distinct world values guard against a
     // migration that collapses or drops the column's contents.
-    for (const [id, worldUid] of [["q1", "world-a"], ["q2", "world-b"]]) {
+    for (const [id, worldId] of [["q1", "world-a"], ["q2", "world-b"]]) {
       await substrate.connection.execute({
         sql:
           "INSERT INTO quads (id, s, s_type, p, o, o_type, o_datatype, o_lang, g, g_type, world_uid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -144,7 +144,7 @@ Deno.test("D1 schema compatibility migrates a legacy v1 world_uid schema to worl
           "",
           "g",
           "NamedNode",
-          worldUid,
+          worldId,
         ],
       });
     }
