@@ -189,45 +189,19 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       sql:
         `CREATE TABLE IF NOT EXISTS worlds_data_plane_schema (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`,
     });
-    await this.connection.execute({
-      sql:
-        "INSERT OR IGNORE INTO worlds_data_plane_schema (version) VALUES (?)",
-      args: [1],
+    // Verify before stamping. The version row is the record that this database
+    // holds the canonical schema, so it must only be written once the columns
+    // have actually been confirmed. Stamping first would let a database that
+    // failed verification pass every later boot on the version check alone.
+    await assertD1SchemaCompatible(this.connection, {
+      worldId: this.worldId,
     });
-    if (this.worldId) {
-      await this.migrateWorldIdColumns();
-      await assertD1SchemaCompatible(this.connection, {
-        worldId: this.worldId,
-      });
-    }
-    await this.refreshCount();
-  }
-
-  /**
-   * migrateWorldIdColumns upgrades a legacy v1 data plane in place: databases
-   * created under the pre-canonical schema carry a `world_uid` column on the
-   * `quads` and `chunks` tables. These are renamed to `world_id` (D1 supports
-   * ALTER TABLE ... RENAME COLUMN) and the schema version is recorded as v2 so
-   * the compatibility assertion below runs against the canonical shape.
-   * Fresh databases never hit the rename branch (they already emit `world_id`).
-   */
-  private async migrateWorldIdColumns(): Promise<void> {
-    for (const table of ["quads", "chunks"]) {
-      const columnResult = await this.connection.execute<{ name: string }>({
-        sql: `PRAGMA table_info(${table})`,
-      });
-      const columns = new Set(columnResult.rows.map((row) => row.name));
-      if (columns.has("world_uid") && !columns.has("world_id")) {
-        await this.connection.execute({
-          sql: `ALTER TABLE ${table} RENAME COLUMN world_uid TO world_id`,
-        });
-      }
-    }
     await this.connection.execute({
       sql:
         "INSERT OR IGNORE INTO worlds_data_plane_schema (version) VALUES (?)",
       args: [D1_DATA_PLANE_SCHEMA_VERSION],
     });
+    await this.refreshCount();
   }
 
   private async refreshCount(): Promise<void> {

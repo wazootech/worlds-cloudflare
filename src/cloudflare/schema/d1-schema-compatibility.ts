@@ -64,12 +64,17 @@ export async function checkD1SchemaCompatibility(
       detail: "missing schema version table",
     });
   }
-  if (schemaVersion !== D1_DATA_PLANE_SCHEMA_VERSION) {
+  // A null version means "created but not yet stamped". The store stamps the
+  // canonical version only after this check passes, so a database that failed
+  // verification is never recorded as verified. Only a recorded version can be
+  // wrong; an absent one is a fresh database still being brought up.
+  if (
+    schemaVersion !== null && schemaVersion !== D1_DATA_PLANE_SCHEMA_VERSION
+  ) {
     issues.push({
       table: SCHEMA_VERSION_TABLE,
-      detail: `expected schema version ${D1_DATA_PLANE_SCHEMA_VERSION}, found ${
-        schemaVersion ?? "none"
-      }`,
+      detail:
+        `expected schema version ${D1_DATA_PLANE_SCHEMA_VERSION}, found ${schemaVersion}`,
     });
   }
   const requiredColumns = Object.fromEntries(
@@ -108,12 +113,15 @@ export async function assertD1SchemaCompatible(
 ): Promise<void> {
   const report = await checkD1SchemaCompatibility(connection, options);
   if (!report.compatible) {
+    const issues = report.issues
+      .map((issue) => `${issue.table}: ${issue.detail}`)
+      .join(", ");
     throw new Error(
-      `D1 schema is incompatible with @worlds/cloudflare: ${
-        report.issues.map((issue) => `${issue.table}: ${issue.detail}`).join(
-          ", ",
-        )
-      }`,
+      `D1 schema is incompatible with @worlds/cloudflare: ${issues}. ` +
+        `This package creates the canonical schema on demand and does not ` +
+        `migrate existing databases. If this database predates the canonical ` +
+        `world_id column, drop and recreate it; there is no supported upgrade ` +
+        `path.`,
     );
   }
 }
