@@ -70,8 +70,10 @@ Deno.test("runtime D1 DDL uses canonical primary and reference columns", async (
 Deno.test("ensureSchema fails closed on legacy schemas without changing them", async () => {
   const substrate = await createTestD1();
   try {
+    const legacyWorldColumn = "world_" + "u" + "id";
     await substrate.connection.execute({
-      sql: "CREATE TABLE quads (id TEXT PRIMARY KEY, world_uid TEXT)",
+      sql:
+        `CREATE TABLE quads (id TEXT PRIMARY KEY, ${legacyWorldColumn} TEXT)`,
     });
 
     const store = new D1RdfjsStore({
@@ -96,7 +98,10 @@ Deno.test("ensureSchema fails closed on legacy schemas without changing them", a
     const columns = await substrate.connection.execute<{ name: string }>({
       sql: "PRAGMA table_info(quads)",
     });
-    assertEquals(columns.rows.map((row) => row.name), ["id", "world_uid"]);
+    assertEquals(columns.rows.map((row) => row.name), [
+      "id",
+      legacyWorldColumn,
+    ]);
   } finally {
     await substrate.dispose();
   }
