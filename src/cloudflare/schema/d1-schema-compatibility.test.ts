@@ -11,25 +11,19 @@ import { D1RdfjsStore } from "@/cloudflare/rdfjs-store/mod.ts";
 Deno.test("D1 schema compatibility accepts the generated schema", async () => {
   const substrate = await createTestD1();
   try {
-    const builder = new D1SchemaBuilder(32, { worldId: "world-a" });
-    for (const ddl of builder.buildTables()) {
-      await substrate.connection.execute({ sql: ddl });
-    }
-    await substrate.connection.execute({
-      sql:
-        "CREATE TABLE worlds_data_plane_schema (schema_version_id INTEGER PRIMARY KEY, version INTEGER NOT NULL UNIQUE, applied_at TEXT NOT NULL)",
+    const store = new D1RdfjsStore({
+      connection: substrate.connection,
+      worldId: "world-a",
     });
-    await substrate.connection.execute({
-      sql:
-        "INSERT INTO worlds_data_plane_schema (version, applied_at) VALUES (3, datetime('now'))",
-    });
+    await store.ensureSchema();
+
     const report = await checkD1SchemaCompatibility(substrate.connection, {
       worldId: "world-a",
     });
     assertEquals(report, {
       compatible: true,
       issues: [],
-      schemaVersion: 3,
+      schemaVersion: 4,
     });
     await assertD1SchemaCompatible(substrate.connection, {
       worldId: "world-a",
@@ -104,7 +98,7 @@ Deno.test("D1 schema compatibility rejects an unexpected schema version", async 
     assertEquals(report.compatible, false);
     assertEquals(
       report.issues.some((issue) =>
-        issue.detail === "expected schema version 3, found 99"
+        issue.detail === "expected schema version 4, found 99"
       ),
       true,
     );
@@ -112,7 +106,7 @@ Deno.test("D1 schema compatibility rejects an unexpected schema version", async 
       () =>
         assertD1SchemaCompatible(substrate.connection, { worldId: "world-a" }),
       Error,
-      "expected schema version 3, found 99",
+      "expected schema version 4, found 99",
     );
   } finally {
     await substrate.dispose();
@@ -122,18 +116,15 @@ Deno.test("D1 schema compatibility rejects an unexpected schema version", async 
 Deno.test("D1 schema compatibility treats an unstamped version as not yet verified", async () => {
   const substrate = await createTestD1();
   try {
-    const builder = new D1SchemaBuilder(32, { worldId: "world-a" });
-    for (const ddl of builder.buildTables()) {
-      await substrate.connection.execute({ sql: ddl });
-    }
+    const store = new D1RdfjsStore({
+      connection: substrate.connection,
+      worldId: "world-a",
+    });
+    await store.ensureSchema();
     await substrate.connection.execute({
-      sql:
-        "CREATE TABLE worlds_data_plane_schema (schema_version_id INTEGER PRIMARY KEY, version INTEGER NOT NULL UNIQUE, applied_at TEXT NOT NULL)",
+      sql: "DELETE FROM worlds_data_plane_schema",
     });
 
-    // The version row is written only after verification passes, so an empty
-    // version table with otherwise-correct columns is a database mid-bring-up,
-    // not a version mismatch.
     const report = await checkD1SchemaCompatibility(substrate.connection, {
       worldId: "world-a",
     });
@@ -143,35 +134,31 @@ Deno.test("D1 schema compatibility treats an unstamped version as not yet verifi
   }
 });
 
-Deno.test("ensureSchema does not stamp a version for a database it could not verify", async () => {
+Deno.test("ensureSchema does not stamp an incompatible schema", async () => {
   const substrate = await createTestD1();
   try {
-    // Build the schema without a world column, then open a world-scoped store
-    // against it. CREATE TABLE IF NOT EXISTS cannot add the missing column, so
-    // verification must fail.
-    const builder = new D1SchemaBuilder(32);
-    for (const ddl of builder.buildTables()) {
-      await substrate.connection.execute({ sql: ddl });
-    }
+    const unscopedStore = new D1RdfjsStore({
+      connection: substrate.connection,
+    });
+    await unscopedStore.ensureSchema();
+    await substrate.connection.execute({
+      sql: "DELETE FROM worlds_data_plane_schema",
+    });
 
-    const store = new D1RdfjsStore({
+    const worldScopedStore = new D1RdfjsStore({
       connection: substrate.connection,
       worldId: "world-a",
     });
     await assertRejects(
-      () => store.ensureSchema(),
+      () => worldScopedStore.ensureSchema(),
       Error,
       "quads: missing column world_id",
     );
 
-    // The regression this guards: a database that failed verification must not
-    // be recorded as holding the canonical schema. If it were, the version
-    // check would pass on every later boot and the missing column would only
-    // ever be caught by the per-table column probe.
     const stamped = await substrate.connection.execute<{ count: number }>({
       sql:
         "SELECT COUNT(*) AS count FROM worlds_data_plane_schema WHERE version = ?",
-      args: [3],
+      args: [4],
     });
     assertEquals(Number(stamped.rows[0]?.count), 0);
   } finally {
@@ -192,12 +179,12 @@ Deno.test("ensureSchema stamps the canonical version once verification passes", 
     const report = await checkD1SchemaCompatibility(substrate.connection, {
       worldId: "world-a",
     });
-    assertEquals(report, { compatible: true, issues: [], schemaVersion: 3 });
+    assertEquals(report, { compatible: true, issues: [], schemaVersion: 4 });
 
     const stamped = await substrate.connection.execute<{ count: number }>({
       sql:
         "SELECT COUNT(*) AS count FROM worlds_data_plane_schema WHERE version = ?",
-      args: [3],
+      args: [4],
     });
     assertEquals(Number(stamped.rows[0]?.count), 1);
   } finally {

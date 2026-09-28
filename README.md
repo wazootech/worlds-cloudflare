@@ -32,6 +32,14 @@ branch plan. The D1-specific pieces stay local: the `chunks` table's `F32_BLOB`
 vector column reserved for Vectorize sync, the blob-bind chunk insert, and the
 empty-query fallback statement.
 
+## D1 schema rollout
+
+The D1 store creates its canonical schema on an empty database and verifies an
+existing canonical schema before serving traffic. It does not migrate older
+UID-era tables or preserve their rows. Reset each target D1 from its canonical
+schema before deploying this breaking release; startup rejects an incompatible
+schema instead of changing it in place.
+
 ## Install
 
 ### Package managers

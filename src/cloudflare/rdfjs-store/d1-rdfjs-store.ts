@@ -175,6 +175,16 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
    * shared sql-core emitters' multi-line DDL.
    */
   public async ensureSchema(): Promise<void> {
+    const existingTables = await this.connection.execute<{ name: string }>({
+      sql:
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('quads', 'chunks', 'chunks_fts', 'worlds_data_plane_schema')",
+    });
+    if (existingTables.rows.length > 0) {
+      await assertD1SchemaCompatible(this.connection, {
+        worldId: this.worldId,
+      });
+    }
+
     const statements = [
       ...this.schemaBuilder.buildTables(),
       ...this.schemaBuilder.buildIndexes(),
@@ -200,6 +210,9 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
       sql:
         "INSERT OR IGNORE INTO worlds_data_plane_schema (version) VALUES (?)",
       args: [D1_DATA_PLANE_SCHEMA_VERSION],
+    });
+    await assertD1SchemaCompatible(this.connection, {
+      worldId: this.worldId,
     });
     await this.refreshCount();
   }

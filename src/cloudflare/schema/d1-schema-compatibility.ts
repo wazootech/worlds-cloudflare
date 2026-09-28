@@ -11,7 +11,7 @@ export interface D1SchemaCompatibilityReport {
   schemaVersion: number | null;
 }
 
-export const D1_DATA_PLANE_SCHEMA_VERSION = 3;
+export const D1_DATA_PLANE_SCHEMA_VERSION = 4;
 const SCHEMA_VERSION_TABLE = "worlds_data_plane_schema";
 
 const REQUIRED_COLUMNS: Record<string, string[]> = {
@@ -140,6 +140,9 @@ export async function checkD1SchemaCompatibility(
       sql: `PRAGMA table_info(${table})`,
     });
     const actual = new Set(columnResult.rows.map((row) => row.name));
+    if (actual.has("id")) {
+      issues.push({ table, detail: "legacy id column remains" });
+    }
     for (const column of columns) {
       if (!actual.has(column)) {
         issues.push({ table, detail: `missing column ${column}` });
@@ -161,6 +164,41 @@ export async function checkD1SchemaCompatibility(
       });
     }
   }
+  const ftsTableResult = await connection.execute<{ sql: string }>({
+    sql:
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'chunks_fts'",
+  });
+  const ftsSql = ftsTableResult.rows[0]?.sql;
+  if (!ftsSql) {
+    issues.push({ table: "chunks_fts", detail: "missing table" });
+  }
+  const ftsColumnResult = await connection.execute<{ name: string }>({
+    sql: "PRAGMA table_info(chunks_fts)",
+  });
+  const ftsColumns = new Set(ftsColumnResult.rows.map((row) => row.name));
+  if (!ftsColumns.has("fts_value")) {
+    issues.push({ table: "chunks_fts", detail: "missing column fts_value" });
+  }
+  for (const legacyColumn of ["quad_id"]) {
+    if (ftsColumns.has(legacyColumn)) {
+      issues.push({
+        table: "chunks_fts",
+        detail: `legacy ${legacyColumn} column remains`,
+      });
+    }
+  }
+  const normalizedFtsSql = (ftsSql ?? "").replaceAll(/\s+/g, "").toLowerCase();
+  if (
+    !normalizedFtsSql.includes("content='chunks'") ||
+    !normalizedFtsSql.includes("content_rowid='chunk_id'") ||
+    ftsColumns.size !== 1
+  ) {
+    issues.push({
+      table: "chunks_fts",
+      detail: "not canonical external-content FTS5 schema",
+    });
+  }
+
   return { compatible: issues.length === 0, issues, schemaVersion };
 }
 
