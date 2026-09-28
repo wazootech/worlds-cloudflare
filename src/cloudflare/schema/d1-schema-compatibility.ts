@@ -11,12 +11,12 @@ export interface D1SchemaCompatibilityReport {
   schemaVersion: number | null;
 }
 
-export const D1_DATA_PLANE_SCHEMA_VERSION = 2;
+export const D1_DATA_PLANE_SCHEMA_VERSION = 3;
 const SCHEMA_VERSION_TABLE = "worlds_data_plane_schema";
 
 const REQUIRED_COLUMNS: Record<string, string[]> = {
   quads: [
-    "id",
+    "quad_id",
     "s",
     "s_type",
     "p",
@@ -28,7 +28,7 @@ const REQUIRED_COLUMNS: Record<string, string[]> = {
     "g_type",
   ],
   chunks: [
-    "id",
+    "chunk_id",
     "quad_id",
     "subject",
     "predicate",
@@ -37,6 +37,12 @@ const REQUIRED_COLUMNS: Record<string, string[]> = {
     "fts_value",
     "vector",
   ],
+};
+
+const REQUIRED_PRIMARY_KEYS: Record<string, string> = {
+  [SCHEMA_VERSION_TABLE]: "schema_version_id",
+  quads: "quad_id",
+  chunks: "chunk_id",
 };
 
 /** Inspect the actual D1 schema and report missing required tables or columns. */
@@ -50,24 +56,58 @@ export async function checkD1SchemaCompatibility(
     sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
     args: [SCHEMA_VERSION_TABLE],
   });
-  if (versionTableResult.rows.length > 0) {
-    const versionResult = await connection.execute<{ version: number }>({
-      sql:
-        `SELECT version FROM ${SCHEMA_VERSION_TABLE} ORDER BY version DESC LIMIT 1`,
-    });
-    schemaVersion = versionResult.rows[0]?.version == null
-      ? null
-      : Number(versionResult.rows[0].version);
-  } else {
+  if (versionTableResult.rows.length === 0) {
     issues.push({
       table: SCHEMA_VERSION_TABLE,
       detail: "missing schema version table",
     });
+  } else {
+    const versionTableInfo = await connection.execute<{
+      name: string;
+      pk: number;
+    }>({
+      sql: `PRAGMA table_info(${SCHEMA_VERSION_TABLE})`,
+    });
+    const versionColumns = new Set(
+      versionTableInfo.rows.map((column) => column.name),
+    );
+    for (const column of ["schema_version_id", "version", "applied_at"]) {
+      if (!versionColumns.has(column)) {
+        issues.push({
+          table: SCHEMA_VERSION_TABLE,
+          detail: `missing column ${column}`,
+        });
+      }
+    }
+    const versionPrimaryKeys = versionTableInfo.rows.filter(
+      (column) => Number(column.pk) > 0,
+    );
+    if (
+      versionPrimaryKeys.length !== 1 ||
+      versionPrimaryKeys[0]?.name !==
+        REQUIRED_PRIMARY_KEYS[SCHEMA_VERSION_TABLE]
+    ) {
+      const found = versionPrimaryKeys.map((column) =>
+        column.name
+      ).join(", ") ||
+        "none";
+      issues.push({
+        table: SCHEMA_VERSION_TABLE,
+        detail: `expected primary key ${
+          REQUIRED_PRIMARY_KEYS[SCHEMA_VERSION_TABLE]
+        }, found ${found}`,
+      });
+    }
+    if (versionColumns.has("version")) {
+      const versionResult = await connection.execute<{ version: number }>({
+        sql:
+          `SELECT version FROM ${SCHEMA_VERSION_TABLE} ORDER BY version DESC LIMIT 1`,
+      });
+      schemaVersion = versionResult.rows[0]?.version == null
+        ? null
+        : Number(versionResult.rows[0].version);
+    }
   }
-  // A null version means "created but not yet stamped". The store stamps the
-  // canonical version only after this check passes, so a database that failed
-  // verification is never recorded as verified. Only a recorded version can be
-  // wrong; an absent one is a fresh database still being brought up.
   if (
     schemaVersion !== null && schemaVersion !== D1_DATA_PLANE_SCHEMA_VERSION
   ) {
@@ -93,7 +133,10 @@ export async function checkD1SchemaCompatibility(
       continue;
     }
 
-    const columnResult = await connection.execute<{ name: string }>({
+    const columnResult = await connection.execute<{
+      name: string;
+      pk: number;
+    }>({
       sql: `PRAGMA table_info(${table})`,
     });
     const actual = new Set(columnResult.rows.map((row) => row.name));
@@ -101,6 +144,21 @@ export async function checkD1SchemaCompatibility(
       if (!actual.has(column)) {
         issues.push({ table, detail: `missing column ${column}` });
       }
+    }
+    const primaryKeys = columnResult.rows.filter(
+      (column) => Number(column.pk) > 0,
+    );
+    const expectedPrimaryKey = REQUIRED_PRIMARY_KEYS[table];
+    if (
+      primaryKeys.length !== 1 ||
+      primaryKeys[0]?.name !== expectedPrimaryKey
+    ) {
+      const found = primaryKeys.map((column) => column.name).join(", ") ||
+        "none";
+      issues.push({
+        table,
+        detail: `expected primary key ${expectedPrimaryKey}, found ${found}`,
+      });
     }
   }
   return { compatible: issues.length === 0, issues, schemaVersion };
@@ -118,10 +176,8 @@ export async function assertD1SchemaCompatible(
       .join(", ");
     throw new Error(
       `D1 schema is incompatible with @worlds/cloudflare: ${issues}. ` +
-        `This package creates the canonical schema on demand and does not ` +
-        `migrate existing databases. If this database predates the canonical ` +
-        `world_id column, drop and recreate it; there is no supported upgrade ` +
-        `path.`,
+        `Automatic schema creation is not an in-place migration. Apply the ` +
+        `documented clean reset before serving traffic.`,
     );
   }
 }

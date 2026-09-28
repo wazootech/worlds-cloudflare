@@ -187,7 +187,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     }
     await this.connection.execute({
       sql:
-        `CREATE TABLE IF NOT EXISTS worlds_data_plane_schema (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+        `CREATE TABLE IF NOT EXISTS worlds_data_plane_schema (schema_version_id INTEGER PRIMARY KEY, version INTEGER NOT NULL UNIQUE, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`,
     });
     // Verify before stamping. The version row is the record that this database
     // holds the canonical schema, so it must only be written once the columns
