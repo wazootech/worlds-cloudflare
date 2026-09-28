@@ -82,21 +82,13 @@ export class D1SchemaBuilder {
   }
 
   public buildD1ChunksFtsTable(): string {
-    return `CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
-      fts_value,
-      content='chunks',
-      content_rowid='chunk_id'
-    )`;
+    return "CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(fts_value, content='chunks', content_rowid='chunk_id')";
   }
 
   public buildD1ChunksTriggers(): string[] {
     return [
-      `CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN
-        INSERT INTO chunks_fts(rowid, fts_value) VALUES (new.chunk_id, new.fts_value);
-      END;`,
-      `CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN
-        INSERT INTO chunks_fts(chunks_fts, rowid, fts_value) VALUES('delete', old.chunk_id, old.fts_value);
-      END;`,
+      "CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN INSERT INTO chunks_fts(rowid, fts_value) VALUES (new.chunk_id, new.fts_value); END",
+      "CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN INSERT INTO chunks_fts(chunks_fts, rowid, fts_value) VALUES ('delete', old.chunk_id, old.fts_value); END",
     ];
   }
 }

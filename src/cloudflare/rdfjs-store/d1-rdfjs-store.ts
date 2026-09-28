@@ -166,43 +166,38 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
   }
 
   /**
-   * ensureSchema creates the quads/chunks tables, covering indexes, and the
-   * FTS5 external-content table + triggers (idempotent) and seeds the live
-   * count. Called by the SDK factory; safe to call again.
-   *
-   * Statements run through the prepared-statement path (not exec()) because
-   * D1's script executor splits on newlines, which would truncate the
-   * shared sql-core emitters' multi-line DDL.
+   * ensureSchema creates the canonical data-plane schema on a fresh D1 and
+   * verifies existing schemas without migrating them. Legacy layouts must be
+   * clean-reset before this store starts; this method never renames columns,
+   * copies rows, or rebuilds existing FTS data.
    */
   public async ensureSchema(): Promise<void> {
-    const existingTables = await this.connection.execute<{ name: string }>({
+    const schemaTables = await this.connection.execute<{ name: string }>({
       sql:
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('quads', 'chunks', 'chunks_fts', 'worlds_data_plane_schema')",
     });
-    if (existingTables.rows.length > 0) {
+    if (schemaTables.rows.length > 0) {
       await assertD1SchemaCompatible(this.connection, {
         worldId: this.worldId,
       });
     }
 
     const statements = [
-      ...this.schemaBuilder.buildTables(),
-      ...this.schemaBuilder.buildIndexes(),
-      this.schemaBuilder.buildD1ChunksQuadIdIndex(),
-      this.schemaBuilder.buildD1ChunksFtsTable(),
-      ...this.schemaBuilder.buildD1ChunksTriggers(),
+      ...[
+        ...this.schemaBuilder.buildTables(),
+        ...this.schemaBuilder.buildIndexes(),
+        this.schemaBuilder.buildD1ChunksQuadIdIndex(),
+        this.schemaBuilder.buildD1ChunksFtsTable(),
+        {
+          sql:
+            "CREATE TABLE IF NOT EXISTS worlds_data_plane_schema (schema_version_id INTEGER PRIMARY KEY AUTOINCREMENT, version INTEGER NOT NULL UNIQUE, applied_at TEXT NOT NULL DEFAULT (datetime('now')))",
+        },
+      ].map((statement) =>
+        typeof statement === "string" ? { sql: statement } : statement
+      ),
+      ...this.schemaBuilder.buildD1ChunksTriggers().map((sql) => ({ sql })),
     ];
-    for (const ddl of statements) {
-      await this.connection.execute({ sql: ddl });
-    }
-    await this.connection.execute({
-      sql:
-        `CREATE TABLE IF NOT EXISTS worlds_data_plane_schema (schema_version_id INTEGER PRIMARY KEY, version INTEGER NOT NULL UNIQUE, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`,
-    });
-    // Verify before stamping. The version row is the record that this database
-    // holds the canonical schema, so it must only be written once the columns
-    // have actually been confirmed. Stamping first would let a database that
-    // failed verification pass every later boot on the version check alone.
+    await this.connection.batch(statements);
     await assertD1SchemaCompatible(this.connection, {
       worldId: this.worldId,
     });
