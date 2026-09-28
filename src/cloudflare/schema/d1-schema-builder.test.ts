@@ -75,7 +75,7 @@ Deno.test("quads table - 10-column libsql reference shape", () => {
   const ddl = testSchemaBuilder.buildD1QuadsTable();
   for (
     const column of [
-      "id TEXT PRIMARY KEY",
+      "quad_id TEXT PRIMARY KEY",
       "s TEXT NOT NULL",
       "s_type TEXT NOT NULL",
       "p TEXT NOT NULL",
@@ -91,8 +91,12 @@ Deno.test("quads table - 10-column libsql reference shape", () => {
   }
 });
 
-Deno.test("chunks table - F32_BLOB vector column is dimension-aware", () => {
+Deno.test("chunks table - entity-specific primary key and dimension-aware vector column", () => {
   const ddl = new D1SchemaBuilder(768).buildD1ChunksTable();
+  assertEquals(
+    ddl.includes("chunk_id INTEGER PRIMARY KEY AUTOINCREMENT"),
+    true,
+  );
   assertEquals(ddl.includes("vector F32_BLOB(768)"), true);
 
   const smallDdl = new D1SchemaBuilder(384).buildD1ChunksTable();
@@ -117,7 +121,7 @@ Deno.test("FTS5 - external-content table and sync triggers are D1-safe", () => {
     true,
   );
   assertEquals(fts.includes("content='chunks'"), true);
-  assertEquals(fts.includes("content_rowid='id'"), true);
+  assertEquals(fts.includes("content_rowid='chunk_id'"), true);
 
   const triggers = testSchemaBuilder.buildD1ChunksTriggers();
   assertEquals(triggers.length, 2);

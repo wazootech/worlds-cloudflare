@@ -38,9 +38,10 @@ Deno.test("buildSearchQuery - keyword plan with filters and stable arg order", (
   assertEquals(plan.sql.includes("chunks_fts MATCH ?"), true);
   assertEquals(plan.sql.includes("chunks.graph IN (?)"), true);
   assertEquals(
-    plan.sql.includes("JOIN chunks ON chunks.id = fts_matches.rowid"),
+    plan.sql.includes("JOIN chunks ON chunks.chunk_id = fts_matches.rowid"),
     true,
   );
+  assertEquals(plan.sql.includes("chunks.id"), false);
   // Match expression, candidate limit, filter binds, then the final limit.
   assertEquals(plan.args, ['"needle"', 5, "urn:g", 5]);
 });

@@ -1,8 +1,4 @@
-import {
-  buildChunksFtsTable,
-  buildChunksQuadIdIndex,
-  buildChunksTriggers,
-} from "@worlds/sqlite/sql-core";
+import { buildChunksQuadIdIndex } from "@worlds/sqlite/sql-core";
 
 /** Maximum embedding dimensions accepted by D1SchemaBuilder (Vectorize cap: 1536 float32). */
 const D1_MAX_VECTOR_DIMENSIONS = 1536;
@@ -70,13 +66,13 @@ export class D1SchemaBuilder {
   }
 
   public buildD1QuadsTable(): string {
-    return `CREATE TABLE IF NOT EXISTS quads (id TEXT PRIMARY KEY, s TEXT NOT NULL, s_type TEXT NOT NULL, p TEXT NOT NULL, o TEXT NOT NULL, o_type TEXT NOT NULL, o_datatype TEXT, o_lang TEXT, g TEXT NOT NULL, g_type TEXT NOT NULL${
+    return `CREATE TABLE IF NOT EXISTS quads (quad_id TEXT PRIMARY KEY, s TEXT NOT NULL, s_type TEXT NOT NULL, p TEXT NOT NULL, o TEXT NOT NULL, o_type TEXT NOT NULL, o_datatype TEXT, o_lang TEXT, g TEXT NOT NULL, g_type TEXT NOT NULL${
       this.worldId ? ", world_id TEXT NOT NULL" : ""
     })`;
   }
 
   public buildD1ChunksTable(): string {
-    return `CREATE TABLE IF NOT EXISTS chunks (id INTEGER PRIMARY KEY AUTOINCREMENT, quad_id TEXT NOT NULL, subject TEXT NOT NULL, predicate TEXT NOT NULL, graph TEXT NOT NULL, value TEXT NOT NULL, fts_value TEXT NOT NULL, vector F32_BLOB(${this.vectorDimensions})${
+    return `CREATE TABLE IF NOT EXISTS chunks (chunk_id INTEGER PRIMARY KEY AUTOINCREMENT, quad_id TEXT NOT NULL, subject TEXT NOT NULL, predicate TEXT NOT NULL, graph TEXT NOT NULL, value TEXT NOT NULL, fts_value TEXT NOT NULL, vector F32_BLOB(${this.vectorDimensions})${
       this.worldId ? ", world_id TEXT NOT NULL" : ""
     })`;
   }
@@ -86,10 +82,21 @@ export class D1SchemaBuilder {
   }
 
   public buildD1ChunksFtsTable(): string {
-    return buildChunksFtsTable();
+    return `CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+      fts_value,
+      content='chunks',
+      content_rowid='chunk_id'
+    )`;
   }
 
   public buildD1ChunksTriggers(): string[] {
-    return buildChunksTriggers();
+    return [
+      `CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN
+        INSERT INTO chunks_fts(rowid, fts_value) VALUES (new.chunk_id, new.fts_value);
+      END;`,
+      `CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN
+        INSERT INTO chunks_fts(chunks_fts, rowid, fts_value) VALUES('delete', old.chunk_id, old.fts_value);
+      END;`,
+    ];
   }
 }
