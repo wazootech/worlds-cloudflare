@@ -50,27 +50,29 @@ export async function checkD1SchemaCompatibility(
     sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
     args: [SCHEMA_VERSION_TABLE],
   });
-  if (versionTableResult.rows.length > 0) {
-    const versionResult = await connection.execute<{ version: number }>({
-      sql:
-        `SELECT version FROM ${SCHEMA_VERSION_TABLE} ORDER BY version DESC LIMIT 1`,
-    });
-    schemaVersion = versionResult.rows[0]?.version == null
-      ? null
-      : Number(versionResult.rows[0].version);
-  } else {
+  if (versionTableResult.rows.length === 0) {
     issues.push({
       table: SCHEMA_VERSION_TABLE,
       detail: "missing schema version table",
     });
-  }
-  if (versionTableResult.rows.length > 0) {
+  } else {
     const versionColumns = await connection.execute<{
       name: string;
       pk: number;
     }>({
       sql: `PRAGMA table_info(${SCHEMA_VERSION_TABLE})`,
     });
+    const actualVersionColumns = new Set(
+      versionColumns.rows.map((column) => column.name),
+    );
+    for (const column of ["version", "applied_at"]) {
+      if (!actualVersionColumns.has(column)) {
+        issues.push({
+          table: SCHEMA_VERSION_TABLE,
+          detail: `missing column ${column}`,
+        });
+      }
+    }
     const primaryKeys = versionColumns.rows.filter((row) => row.pk > 0);
     if (
       primaryKeys.length !== 1 ||
@@ -82,6 +84,15 @@ export async function checkD1SchemaCompatibility(
           primaryKeys.map((row) => row.name).join(", ") || "none"
         }`,
       });
+    }
+    if (actualVersionColumns.has("version")) {
+      const versionResult = await connection.execute<{ version: number }>({
+        sql:
+          `SELECT version FROM ${SCHEMA_VERSION_TABLE} ORDER BY version DESC LIMIT 1`,
+      });
+      schemaVersion = versionResult.rows[0]?.version == null
+        ? null
+        : Number(versionResult.rows[0].version);
     }
   }
   if (

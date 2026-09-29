@@ -109,6 +109,42 @@ Deno.test("D1 schema compatibility reports missing tables and columns", async ()
   }
 });
 
+Deno.test("D1 schema compatibility rejects an incomplete version table before stamping", async () => {
+  const substrate = await createTestD1();
+  try {
+    await substrate.connection.execute({
+      sql:
+        "CREATE TABLE worlds_data_plane_schema (schema_version_id INTEGER PRIMARY KEY, version INTEGER NOT NULL UNIQUE)",
+    });
+    await substrate.connection.execute({
+      sql: "INSERT INTO worlds_data_plane_schema (version) VALUES (4)",
+    });
+
+    const report = await checkD1SchemaCompatibility(substrate.connection);
+    assertEquals(report.compatible, false);
+    assertEquals(
+      report.issues.some((issue) =>
+        issue.table === "worlds_data_plane_schema" &&
+        issue.detail === "missing column applied_at"
+      ),
+      true,
+    );
+    await assertRejects(
+      () =>
+        new D1RdfjsStore({ connection: substrate.connection }).ensureSchema(),
+      Error,
+      "worlds_data_plane_schema: missing column applied_at",
+    );
+
+    const versions = await substrate.connection.execute<{ count: number }>({
+      sql: "SELECT COUNT(*) AS count FROM worlds_data_plane_schema",
+    });
+    assertEquals(Number(versions.rows[0]?.count), 1);
+  } finally {
+    await substrate.dispose();
+  }
+});
+
 Deno.test("D1 schema compatibility rejects an unexpected schema version", async () => {
   const substrate = await createTestD1();
   try {
