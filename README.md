@@ -35,10 +35,11 @@ empty-query fallback statement.
 ## D1 schema rollout
 
 The D1 store creates its canonical schema on an empty database and verifies an
-existing canonical schema before serving traffic. It does not migrate older
-UID-era tables or preserve their rows. Reset each target D1 from its canonical
-schema before deploying this breaking release; startup rejects an incompatible
-schema instead of changing it in place.
+existing schema's version, tables, columns, and primary keys before serving
+traffic. It does not migrate older layouts or preserve their rows. Reset each
+target D1 before deploying this breaking release; startup rejects an
+incompatible schema instead of changing it in place. The schema-version row is
+written only after the schema has passed compatibility checks.
 
 ## Install
 
@@ -58,7 +59,7 @@ npx jsr add @worlds/cloudflare
 bundler needed.
 
 ```js
-import { createCloudflareWorldsSdk } from "https://esm.sh/jsr/@worlds/cloudflare@0.8.0";
+import { createCloudflareWorldsSdk } from "https://esm.sh/jsr/@worlds/cloudflare@0.9.0";
 ```
 
 With an import map:
@@ -67,7 +68,7 @@ With an import map:
 <script type="importmap">
 {
   "imports": {
-    "@worlds/cloudflare": "https://esm.sh/jsr/@worlds/cloudflare@0.8.0"
+    "@worlds/cloudflare": "https://esm.sh/jsr/@worlds/cloudflare@0.9.0"
   }
 }
 </script>
@@ -79,7 +80,7 @@ import { createCloudflareWorldsSdk } from "@worlds/cloudflare";
 Pin to an exact build for deterministic caching:
 
 ```js
-import { createCloudflareWorldsSdk } from "https://esm.sh/jsr/@worlds/cloudflare@0.8.0?pin=v1724100000";
+import { createCloudflareWorldsSdk } from "https://esm.sh/jsr/@worlds/cloudflare@0.9.0?pin=v1724100000";
 ```
 
 ## Exports

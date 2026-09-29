@@ -91,15 +91,15 @@ Deno.test("quads table - 10-column libsql reference shape", () => {
   }
 });
 
-Deno.test("chunks table - entity-specific primary key and dimension-aware vector column", () => {
+Deno.test("chunks table - F32_BLOB vector column is dimension-aware", () => {
   const ddl = new D1SchemaBuilder(768).buildD1ChunksTable();
-  assertEquals(
-    ddl.includes("chunk_id INTEGER PRIMARY KEY AUTOINCREMENT"),
-    true,
-  );
   assertEquals(ddl.includes("vector F32_BLOB(768)"), true);
 
   const smallDdl = new D1SchemaBuilder(384).buildD1ChunksTable();
+  assertEquals(
+    smallDdl.includes("chunk_id INTEGER PRIMARY KEY AUTOINCREMENT"),
+    true,
+  );
   assertEquals(smallDdl.includes("vector F32_BLOB(384)"), true);
 });
 
@@ -126,5 +126,7 @@ Deno.test("FTS5 - external-content table and sync triggers are D1-safe", () => {
   const triggers = testSchemaBuilder.buildD1ChunksTriggers();
   assertEquals(triggers.length, 2);
   assertEquals(triggers[0]!.includes("chunks_ai AFTER INSERT ON chunks"), true);
+  assertEquals(triggers[0]!.includes("new.chunk_id"), true);
   assertEquals(triggers[1]!.includes("chunks_ad AFTER DELETE ON chunks"), true);
+  assertEquals(triggers[1]!.includes("old.chunk_id"), true);
 });
