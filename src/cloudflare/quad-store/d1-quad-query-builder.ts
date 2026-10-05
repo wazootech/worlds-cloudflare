@@ -66,7 +66,7 @@ export function buildDeleteQuadsByQuadIds(
 ): { sql: string; args: string[] } {
   const placeholders = generatePlaceholders(quadIds.length);
   return {
-    sql: `DELETE FROM quads WHERE id IN (${placeholders})${
+    sql: `DELETE FROM quads WHERE quad_id IN (${placeholders})${
       worldId ? " AND world_id = ?" : ""
     }`,
     args: worldId ? [...quadIds, worldId] : quadIds,
@@ -79,7 +79,7 @@ export function buildSelectExistingQuadIds(
 ): { sql: string; args: string[] } {
   const placeholders = generatePlaceholders(quadIds.length);
   return {
-    sql: `SELECT id FROM quads WHERE id IN (${placeholders})${
+    sql: `SELECT quad_id AS id FROM quads WHERE quad_id IN (${placeholders})${
       worldId ? " AND world_id = ?" : ""
     }`,
     args: worldId ? [...quadIds, worldId] : quadIds,
@@ -98,7 +98,7 @@ export function buildMatchQuadsQuery(
   }
 
   if (pageOptions?.afterQuadId) {
-    conditions.push("id > ?");
+    conditions.push("quad_id > ?");
     args.push(pageOptions.afterQuadId);
   }
 
@@ -114,7 +114,7 @@ export function buildMatchQuadsQuery(
 
   return {
     sql:
-      `SELECT id, s, s_type, p, o, o_type, o_datatype, o_lang, g, g_type FROM quads ${whereClause} ORDER BY id ASC${limitClause}`,
+      `SELECT quad_id AS id, s, s_type, p, o, o_type, o_datatype, o_lang, g, g_type FROM quads ${whereClause} ORDER BY quad_id ASC${limitClause}`,
     args,
   };
 }
@@ -201,7 +201,7 @@ export function buildBulkInsertQuads(
 
     statements.push({
       sql:
-        `INSERT OR REPLACE INTO quads (id, s, s_type, p, o, o_type, o_datatype, o_lang, g, g_type${
+        `INSERT OR REPLACE INTO quads (quad_id, s, s_type, p, o, o_type, o_datatype, o_lang, g, g_type${
           rowBatch[0]?.world_id !== undefined ? ", world_id" : ""
         }) VALUES ${valuePlaceholders}`,
       args,

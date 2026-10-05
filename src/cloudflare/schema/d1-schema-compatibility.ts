@@ -11,12 +11,12 @@ export interface D1SchemaCompatibilityReport {
   schemaVersion: number | null;
 }
 
-export const D1_DATA_PLANE_SCHEMA_VERSION = 2;
+export const D1_DATA_PLANE_SCHEMA_VERSION = 4;
 const SCHEMA_VERSION_TABLE = "worlds_data_plane_schema";
 
 const REQUIRED_COLUMNS: Record<string, string[]> = {
   quads: [
-    "id",
+    "quad_id",
     "s",
     "s_type",
     "p",
@@ -28,7 +28,7 @@ const REQUIRED_COLUMNS: Record<string, string[]> = {
     "g_type",
   ],
   chunks: [
-    "id",
+    "chunk_id",
     "quad_id",
     "subject",
     "predicate",
@@ -64,7 +64,29 @@ export async function checkD1SchemaCompatibility(
       detail: "missing schema version table",
     });
   }
-  if (schemaVersion !== D1_DATA_PLANE_SCHEMA_VERSION) {
+  if (versionTableResult.rows.length > 0) {
+    const versionColumns = await connection.execute<{
+      name: string;
+      pk: number;
+    }>({
+      sql: `PRAGMA table_info(${SCHEMA_VERSION_TABLE})`,
+    });
+    const primaryKeys = versionColumns.rows.filter((row) => row.pk > 0);
+    if (
+      primaryKeys.length !== 1 ||
+      primaryKeys[0]?.name !== "schema_version_id"
+    ) {
+      issues.push({
+        table: SCHEMA_VERSION_TABLE,
+        detail: `primary key must be schema_version_id, found ${
+          primaryKeys.map((row) => row.name).join(", ") || "none"
+        }`,
+      });
+    }
+  }
+  if (
+    schemaVersion !== null && schemaVersion !== D1_DATA_PLANE_SCHEMA_VERSION
+  ) {
     issues.push({
       table: SCHEMA_VERSION_TABLE,
       detail: `expected schema version ${D1_DATA_PLANE_SCHEMA_VERSION}, found ${
@@ -88,15 +110,76 @@ export async function checkD1SchemaCompatibility(
       continue;
     }
 
-    const columnResult = await connection.execute<{ name: string }>({
+    const columnResult = await connection.execute<{
+      name: string;
+      pk: number;
+    }>({
       sql: `PRAGMA table_info(${table})`,
     });
     const actual = new Set(columnResult.rows.map((row) => row.name));
+    if (actual.has("world_uid")) {
+      issues.push({ table, detail: "legacy world_uid column remains" });
+    }
+    const expectedPrimaryKey = table === "quads" ? "quad_id" : "chunk_id";
+    const primaryKeys = columnResult.rows.filter((row) => row.pk > 0);
+    if (
+      primaryKeys.length !== 1 ||
+      primaryKeys[0]?.name !== expectedPrimaryKey
+    ) {
+      issues.push({
+        table,
+        detail: `primary key must be ${expectedPrimaryKey}, found ${
+          primaryKeys.map((row) => row.name).join(", ") || "none"
+        }`,
+      });
+    }
+    if (actual.has("id")) {
+      issues.push({ table, detail: "legacy id column remains" });
+    }
     for (const column of columns) {
       if (!actual.has(column)) {
         issues.push({ table, detail: `missing column ${column}` });
       }
     }
+  }
+
+  const ftsTableResult = await connection.execute<{ sql: string }>({
+    sql:
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'chunks_fts'",
+  });
+  const ftsSql = ftsTableResult.rows[0]?.sql;
+  if (!ftsSql) {
+    issues.push({ table: "chunks_fts", detail: "missing table" });
+  }
+  const ftsColumnResult = await connection.execute<{ name: string }>({
+    sql: "PRAGMA table_info(chunks_fts)",
+  });
+  const ftsColumns = new Set(ftsColumnResult.rows.map((row) => row.name));
+  if (!ftsColumns.has("fts_value")) {
+    issues.push({ table: "chunks_fts", detail: "missing column fts_value" });
+  }
+  if (ftsColumns.has("world_uid")) {
+    issues.push({
+      table: "chunks_fts",
+      detail: "legacy world_uid column remains",
+    });
+  }
+  if (ftsColumns.has("quad_id")) {
+    issues.push({
+      table: "chunks_fts",
+      detail: "redundant quad_id column remains",
+    });
+  }
+  const normalizedFtsSql = (ftsSql ?? "").replaceAll(/\s+/g, "").toLowerCase();
+  if (
+    !normalizedFtsSql.includes("content='chunks'") ||
+    !normalizedFtsSql.includes("content_rowid='chunk_id'") ||
+    ftsColumns.size !== 1
+  ) {
+    issues.push({
+      table: "chunks_fts",
+      detail: "not canonical external-content FTS5 schema",
+    });
   }
   return { compatible: issues.length === 0, issues, schemaVersion };
 }

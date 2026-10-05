@@ -156,12 +156,16 @@ export class D1SearchQueryBuilder {
     const hasKeyword = sanitizedQuery.length > 0;
 
     if (hasKeyword) {
-      return buildKeywordFtsStatement({
+      const statement = buildKeywordFtsStatement({
         sanitizedQuery,
         limit,
         whereFilter,
         filterArgs,
       });
+      return {
+        ...statement,
+        sql: statement.sql.replaceAll("chunks.id", "chunks.chunk_id"),
+      };
     }
 
     return {

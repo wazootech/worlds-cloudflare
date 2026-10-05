@@ -166,68 +166,50 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
   }
 
   /**
-   * ensureSchema creates the quads/chunks tables, covering indexes, and the
-   * FTS5 external-content table + triggers (idempotent) and seeds the live
-   * count. Called by the SDK factory; safe to call again.
-   *
-   * Statements run through the prepared-statement path (not exec()) because
-   * D1's script executor splits on newlines, which would truncate the
-   * shared sql-core emitters' multi-line DDL.
+   * ensureSchema creates the canonical data-plane schema on a fresh D1 and
+   * verifies existing schemas without migrating them. Legacy layouts must be
+   * clean-reset before this store starts; this method never renames columns,
+   * copies rows, or rebuilds existing FTS data.
    */
   public async ensureSchema(): Promise<void> {
-    const statements = [
-      ...this.schemaBuilder.buildTables(),
-      ...this.schemaBuilder.buildIndexes(),
-      this.schemaBuilder.buildD1ChunksQuadIdIndex(),
-      this.schemaBuilder.buildD1ChunksFtsTable(),
-      ...this.schemaBuilder.buildD1ChunksTriggers(),
-    ];
-    for (const ddl of statements) {
-      await this.connection.execute({ sql: ddl });
-    }
-    await this.connection.execute({
+    const schemaTables = await this.connection.execute<{ name: string }>({
       sql:
-        `CREATE TABLE IF NOT EXISTS worlds_data_plane_schema (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('quads', 'chunks', 'chunks_fts', 'worlds_data_plane_schema')",
     });
-    await this.connection.execute({
-      sql:
-        "INSERT OR IGNORE INTO worlds_data_plane_schema (version) VALUES (?)",
-      args: [1],
-    });
-    if (this.worldId) {
-      await this.migrateWorldIdColumns();
+    if (schemaTables.rows.length > 0) {
       await assertD1SchemaCompatible(this.connection, {
         worldId: this.worldId,
       });
     }
-    await this.refreshCount();
-  }
 
-  /**
-   * migrateWorldIdColumns upgrades a legacy v1 data plane in place: databases
-   * created under the pre-canonical schema carry a `world_uid` column on the
-   * `quads` and `chunks` tables. These are renamed to `world_id` (D1 supports
-   * ALTER TABLE ... RENAME COLUMN) and the schema version is recorded as v2 so
-   * the compatibility assertion below runs against the canonical shape.
-   * Fresh databases never hit the rename branch (they already emit `world_id`).
-   */
-  private async migrateWorldIdColumns(): Promise<void> {
-    for (const table of ["quads", "chunks"]) {
-      const columnResult = await this.connection.execute<{ name: string }>({
-        sql: `PRAGMA table_info(${table})`,
-      });
-      const columns = new Set(columnResult.rows.map((row) => row.name));
-      if (columns.has("world_uid") && !columns.has("world_id")) {
-        await this.connection.execute({
-          sql: `ALTER TABLE ${table} RENAME COLUMN world_uid TO world_id`,
-        });
-      }
-    }
+    const statements = [
+      ...[
+        ...this.schemaBuilder.buildTables(),
+        ...this.schemaBuilder.buildIndexes(),
+        this.schemaBuilder.buildD1ChunksQuadIdIndex(),
+        this.schemaBuilder.buildD1ChunksFtsTable(),
+        {
+          sql:
+            "CREATE TABLE IF NOT EXISTS worlds_data_plane_schema (schema_version_id INTEGER PRIMARY KEY AUTOINCREMENT, version INTEGER NOT NULL UNIQUE, applied_at TEXT NOT NULL DEFAULT (datetime('now')))",
+        },
+      ].map((statement) =>
+        typeof statement === "string" ? { sql: statement } : statement
+      ),
+      ...this.schemaBuilder.buildD1ChunksTriggers().map((sql) => ({ sql })),
+    ];
+    await this.connection.batch(statements);
+    await assertD1SchemaCompatible(this.connection, {
+      worldId: this.worldId,
+    });
     await this.connection.execute({
       sql:
         "INSERT OR IGNORE INTO worlds_data_plane_schema (version) VALUES (?)",
       args: [D1_DATA_PLANE_SCHEMA_VERSION],
     });
+    await assertD1SchemaCompatible(this.connection, {
+      worldId: this.worldId,
+    });
+    await this.refreshCount();
   }
 
   private async refreshCount(): Promise<void> {
