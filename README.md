@@ -100,6 +100,22 @@ import { createCloudflareWorldsSdk } from "https://esm.sh/jsr/@worlds/cloudflare
 npx jsr add @worlds/cloudflare
 ```
 
+## Releases
+
+Every push to `main` runs the [Publish workflow](.github/workflows/publish.yml),
+which publishes only when `deno.json`'s `version` is not yet on JSR:
+
+- **Release PR** (bumps `version`): merging it publishes the new version of
+  `@worlds/cloudflare`.
+- **Routine PR** (no bump): the Publish job skips green with a notice. That is
+  expected, not a failure.
+
+To release, bump `version` in `deno.json` (minor for additive public API, patch
+for fixes) in the PR that should ship. If the package ever imports a pinned
+`jsr:@worlds/cloudflare@<version>` of itself, commit that entry to `deno.lock`;
+otherwise a cold CI run rewrites the lockfile and `deno publish` aborts on the
+dirty tree.
+
 ## License
 
 TBD — match sibling Worlds packages.
