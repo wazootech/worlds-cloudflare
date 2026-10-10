@@ -24,6 +24,13 @@ and Workers AI (embeddings) integrations remain planned. The phased plan is
 tracked in
 [worlds-cloudflare#7](https://github.com/wazootech/worlds-cloudflare/issues/7).
 
+**World scoping with Vectorize.** One Vectorize index is shared by every world,
+so `createCloudflareWorldsSdk` requires `worldId` whenever `vectorize` is set
+and throws otherwise. Every vector is stored with `world_id` metadata, every
+vector query is filtered on it, and vector ids are namespaced per world, so
+identical triple text in two worlds never shares a vector
+([worlds-cloudflare#41](https://github.com/wazootech/worlds-cloudflare/issues/41)).
+
 This package consumes the shared, driver-free SQL plan layer from
 [`@worlds/sqlite/sql-core`](https://jsr.io/@worlds/sqlite) — the FTS5
 sanitizer/stopwords, `buildChunkFtsValue`, `buildSearchResultId`, the

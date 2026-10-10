@@ -24,7 +24,11 @@ export interface CloudflareWorldsSdkOptions extends D1ClientBaseOptions {
   /** database is the raw D1 binding (miniflare or a real Worker binding). */
   database: D1DatabaseLike;
 
-  /** worldId scopes all quad and search-index operations when provided. */
+  /**
+   * worldId scopes all quad and search-index operations when provided.
+   * Required when `vectorize` is set: the Vectorize index is shared across
+   * worlds, so an unscoped SDK would write and query vectors across them.
+   */
   worldId?: string;
 
   /**
@@ -54,6 +58,11 @@ export interface CloudflareWorldsSdkOptions extends D1ClientBaseOptions {
 export async function createCloudflareWorldsSdk(
   options: CloudflareWorldsSdkOptions,
 ): Promise<WorldsSdkInterface> {
+  if (options.vectorize && !options.worldId) {
+    throw new Error(
+      "createCloudflareWorldsSdk: worldId is required when vectorize is set; the Vectorize index is shared across worlds (worlds-cloudflare#41)",
+    );
+  }
   const vectorDimensions = options.vectorDimensions ?? 1536;
   const connection = new D1ConnectionDriver(options.database, {
     worldId: options.worldId,
@@ -79,7 +88,7 @@ export async function createCloudflareWorldsSdk(
   const textSplitter = options.textSplitter ??
     new RecursiveCharacterTextSplitter({ chunkSize: 1000 });
 
-  const vectorSearch = options.vectorize
+  const vectorSearch = options.vectorize && options.worldId
     ? new VectorizeVectorSearchIndex({
       index: options.vectorize,
       worldId: options.worldId,
