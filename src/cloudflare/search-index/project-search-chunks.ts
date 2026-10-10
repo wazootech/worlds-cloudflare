@@ -16,6 +16,13 @@ import {
   DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
 } from "@/cloudflare/d1/d1-batch-executor.ts";
 import type { D1Statement } from "@/cloudflare/d1/d1-connection-driver.ts";
+import {
+  emptyVectorSyncReport,
+  logVectorSyncDrift,
+  mergeVectorSyncReports,
+  recordVectorSyncError,
+  type VectorSyncReport,
+} from "./vector-sync-report.ts";
 
 export interface ProjectSearchChunksOptions extends D1ClientBaseOptions {
   /** connection is the D1ConnectionDriver wrapping the D1 binding. */
@@ -38,13 +45,14 @@ export interface ProjectSearchChunksOptions extends D1ClientBaseOptions {
 /**
  * projectSearchChunks processes novel quads to create and store FTS chunks
  * plus embedded vectors (when an embeddingService + vectorSearch are wired).
- * Vector sync failures degrade to keyword-only — they never fail an import.
+ * Vector sync failures never fail an import (D1 stays the source of truth),
+ * but they are counted in the returned report and logged as drift.
  */
 export async function projectSearchChunks(
   novelInsertions: rdfjs.Quad[],
   novelQuadIds: string[],
   options: ProjectSearchChunksOptions,
-): Promise<void> {
+): Promise<VectorSyncReport> {
   const built = await buildChunkStatements(
     novelInsertions,
     novelQuadIds,
@@ -68,19 +76,31 @@ export async function projectSearchChunks(
     }
   }
 
-  await syncVectors(options, vectorEntries);
+  const report = mergeVectorSyncReports(
+    built.report,
+    await syncVectors(options, vectorEntries),
+  );
+  logVectorSyncDrift(report, {
+    worldId: options.worldId,
+    operation: "import",
+  });
+  return report;
 }
 
 /**
  * refreshSearchChunksForQuads deletes existing chunk rows for the given quads and rebuilds FTS projections.
- * Durable `quads` rows are not modified. Returns the number of chunk rows written.
+ * Durable `quads` rows are not modified. Returns the number of chunk rows
+ * written and the vector sync report for the refreshed chunks.
  */
 export async function refreshSearchChunksForQuads(
   quads: rdfjs.Quad[],
   options: ProjectSearchChunksOptions,
-): Promise<number> {
+): Promise<{ chunkRowCount: number; vectorSync: VectorSyncReport }> {
   if (quads.length === 0) {
-    return 0;
+    return {
+      chunkRowCount: 0,
+      vectorSync: emptyVectorSyncReport(vectorSyncEnabled(options)),
+    };
   }
 
   const lookupChunkSize = options.maxLookupChunkSize ?? 100;
@@ -110,10 +130,21 @@ export async function refreshSearchChunksForQuads(
     throw new Error("failed to refresh search chunks", { cause });
   }
 
-  await deleteStaleVectors(options, quadIds, lookupChunkSize);
-  await syncVectors(options, built.vectorEntries);
+  const staleDelete = await deleteStaleVectors(
+    options,
+    quadIds,
+    lookupChunkSize,
+  );
+  const vectorSync = mergeVectorSyncReports(
+    mergeVectorSyncReports(built.report, staleDelete),
+    await syncVectors(options, built.vectorEntries),
+  );
 
-  return chunkInsertStatements.length;
+  return { chunkRowCount: chunkInsertStatements.length, vectorSync };
+}
+
+function vectorSyncEnabled(options: ProjectSearchChunksOptions): boolean {
+  return Boolean(options.embeddingService && options.vectorSearch);
 }
 
 function buildChunkDeletionStatementsChunked(
@@ -133,9 +164,14 @@ async function buildChunkStatements(
   quads: rdfjs.Quad[],
   quadIds: string[],
   options: ProjectSearchChunksOptions,
-): Promise<{ statements: D1Statement[]; vectorEntries: VectorSearchEntry[] }> {
+): Promise<{
+  statements: D1Statement[];
+  vectorEntries: VectorSearchEntry[];
+  report: VectorSyncReport;
+}> {
   const statements: D1Statement[] = [];
   const vectorEntries: VectorSearchEntry[] = [];
+  const report = emptyVectorSyncReport(vectorSyncEnabled(options));
 
   let chunks: ChunkRowPayload[];
   try {
@@ -145,7 +181,7 @@ async function buildChunkStatements(
   }
 
   if (chunks.length === 0) {
-    return { statements, vectorEntries };
+    return { statements, vectorEntries, report };
   }
 
   const chunksWithFtsValue = chunks.map((chunk) => ({
@@ -154,8 +190,8 @@ async function buildChunkStatements(
   }));
 
   // Phase C: embed chunk text only when both an embedding service and a
-  // vector index are wired. Embedding failure degrades to keyword-only for
-  // this pass (the import path never fails because embeddings are down).
+  // vector index are wired. Embedding failure stores the chunks without
+  // vectors (keyword-only) and is counted in the report; reindex repairs it.
   let vectors: Array<Float32Array | undefined> | undefined;
   let embedFailed = false;
   if (options.embeddingService && options.vectorSearch) {
@@ -166,10 +202,8 @@ async function buildChunkStatements(
       vectors = embedded.map((vector) => new Float32Array(vector));
     } catch (error) {
       embedFailed = true;
-      console.warn(
-        "[Search Warning] chunk embedding failed; continuing keyword-only",
-        error,
-      );
+      report.embeddingFailures += chunksWithFtsValue.length;
+      recordVectorSyncError(report, "embed", error);
     }
   }
 
@@ -212,48 +246,52 @@ async function buildChunkStatements(
     }
   }
 
-  return { statements, vectorEntries };
+  return { statements, vectorEntries, report };
 }
 
 /**
- * syncVectors upserts embedded vectors into the outside-D1 vector index.
- * Best-effort: failures log and are skipped (keyword-only still serves).
+ * syncVectors upserts embedded vectors into the outside-D1 vector index and
+ * reports the outcome. A failed upsert does not throw (the D1 write already
+ * committed); it is counted so callers and logs can see the drift.
  */
 async function syncVectors(
   options: ProjectSearchChunksOptions,
   entries: VectorSearchEntry[],
-): Promise<void> {
-  if (entries.length === 0 || !options.vectorSearch) return;
+): Promise<VectorSyncReport> {
+  const report = emptyVectorSyncReport(vectorSyncEnabled(options));
+  if (entries.length === 0 || !options.vectorSearch) return report;
+  report.attempted = entries.length;
   try {
     await options.vectorSearch.upsert(entries);
+    report.upserted = entries.length;
   } catch (error) {
-    console.warn(
-      `[Search Warning] vector index upsert failed for ${entries.length} entries; continuing keyword-only`,
-      error,
-    );
+    report.failedUpserts = entries.length;
+    recordVectorSyncError(report, "upsert", error);
   }
+  return report;
 }
 
 /**
  * deleteStaleVectors removes vectors for chunk rows being refreshed, computed
  * deterministically from the chunk quad ids before the D1 rows are replaced.
+ * A failure leaves stale vectors behind; it is counted, not thrown.
  */
 async function deleteStaleVectors(
   options: ProjectSearchChunksOptions,
   quadIds: string[],
   chunkSize: number,
-): Promise<void> {
-  if (!options.vectorSearch || !options.embeddingService) return;
-
-  try {
-    for (let index = 0; index < quadIds.length; index += chunkSize) {
-      const quadIdBatch = quadIds.slice(index, index + chunkSize);
+): Promise<VectorSyncReport> {
+  const report = emptyVectorSyncReport(vectorSyncEnabled(options));
+  if (!options.vectorSearch || !options.embeddingService) return report;
+  for (let index = 0; index < quadIds.length; index += chunkSize) {
+    const quadIdBatch = quadIds.slice(index, index + chunkSize);
+    const ids: string[] = [];
+    try {
       const resultSet = await options.connection.execute(
         options.searchQueryBuilder.buildChunkVectorLookupByQuadIds(
           quadIdBatch,
         ),
       );
-      const ids: string[] = [];
       for (const row of resultSet.rows) {
         ids.push(
           await buildSearchResultId({
@@ -267,11 +305,10 @@ async function deleteStaleVectors(
       if (ids.length > 0) {
         await options.vectorSearch.deleteByIds(ids);
       }
+    } catch (error) {
+      report.staleDeleteFailures += Math.max(ids.length, 1);
+      recordVectorSyncError(report, "delete-stale", error);
     }
-  } catch (error) {
-    console.warn(
-      "[Search Warning] stale vector deletion failed; continuing",
-      error,
-    );
   }
+  return report;
 }

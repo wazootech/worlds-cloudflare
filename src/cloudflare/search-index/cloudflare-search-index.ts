@@ -17,6 +17,16 @@ import type {
   VectorSearchIndex,
 } from "./vector-search/mod.ts";
 import { rebuildD1SearchIndexFromQuads } from "./rebuild-d1-search-index-from-quads.ts";
+import type { VectorSyncReport } from "./vector-sync-report.ts";
+
+/**
+ * CloudflareReindexResponse is the SDK ReindexResponse plus the vector sync
+ * report, so a reindex whose vector half failed is distinguishable from a
+ * complete one (worlds-cloudflare#40).
+ */
+export interface CloudflareReindexResponse extends ReindexResponse {
+  vectorSync: VectorSyncReport;
+}
 
 /**
  * CloudflareSearchIndexOptions defines the structured configuration and dependency parameters needed to construct the Cloudflare D1 search engine.
@@ -163,11 +173,13 @@ export class CloudflareSearchIndex implements SearchIndexInterface {
   }
 
   /**
-   * reindex rebuilds FTS chunk rows from durable quads without re-importing graph data.
+   * reindex rebuilds FTS chunk rows (and, when wired, re-embeds and re-upserts
+   * vectors) from durable quads without re-importing graph data. It is the
+   * repair path for vector drift; `vectorSync` reports what reached the index.
    */
   public async reindex(
     request?: ReindexRequest,
-  ): Promise<ReindexResponse> {
+  ): Promise<CloudflareReindexResponse> {
     const textSplitter = this.options.textSplitter;
     if (!textSplitter) {
       throw new Error(

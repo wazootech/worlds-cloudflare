@@ -9,6 +9,12 @@ import {
   type ProjectSearchChunksOptions,
   refreshSearchChunksForQuads,
 } from "./project-search-chunks.ts";
+import {
+  emptyVectorSyncReport,
+  logVectorSyncDrift,
+  mergeVectorSyncReports,
+  type VectorSyncReport,
+} from "./vector-sync-report.ts";
 
 /**
  * RebuildD1SearchIndexFromQuadsResult reports how many quads and chunk rows were processed.
@@ -18,6 +24,8 @@ export interface RebuildD1SearchIndexFromQuadsResult {
   processedQuadCount: number;
   /** chunkRowCount is the number of chunk rows written to FTS tables. */
   chunkRowCount: number;
+  /** vectorSync reports what reached the outside-D1 vector index (#40). */
+  vectorSync: VectorSyncReport;
 }
 
 export interface ReadProjectSearchChunksOptions
@@ -48,6 +56,9 @@ export async function rebuildD1SearchIndexFromQuads(
 
   let processedQuadCount = 0;
   let chunkRowCount = 0;
+  let vectorSync = emptyVectorSyncReport(
+    Boolean(options.embeddingService && options.vectorSearch),
+  );
   let afterQuadId: string | undefined;
 
   for (;;) {
@@ -80,7 +91,9 @@ export async function rebuildD1SearchIndexFromQuads(
     }
 
     if (pageQuads.length > 0) {
-      chunkRowCount += await refreshSearchChunksForQuads(pageQuads, options);
+      const refreshed = await refreshSearchChunksForQuads(pageQuads, options);
+      chunkRowCount += refreshed.chunkRowCount;
+      vectorSync = mergeVectorSyncReports(vectorSync, refreshed.vectorSync);
     }
 
     if (resultSet.rows.length < pageSize) {
@@ -88,7 +101,11 @@ export async function rebuildD1SearchIndexFromQuads(
     }
   }
 
-  return { processedQuadCount, chunkRowCount };
+  logVectorSyncDrift(vectorSync, {
+    worldId: searchQueryBuilder.worldId,
+    operation: "reindex",
+  });
+  return { processedQuadCount, chunkRowCount, vectorSync };
 }
 
 /**

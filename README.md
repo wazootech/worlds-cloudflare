@@ -31,6 +31,14 @@ vector query is filtered on it, and vector ids are namespaced per world, so
 identical triple text in two worlds never shares a vector
 ([worlds-cloudflare#41](https://github.com/wazootech/worlds-cloudflare/issues/41)).
 
+**Vector sync is reported, not swallowed.** A failed embedding, vector upsert,
+or stale-vector delete never fails an import (D1 is the source of truth and
+keyword search keeps serving), but it is logged as a structured `[vector-sync]`
+error and counted. `CloudflareSearchIndex.reindex()` returns `vectorSync`
+(`attempted`, `upserted`, `failedUpserts`, `embeddingFailures`,
+`staleDeleteFailures`, `errors`), and rerunning reindex repairs the drift
+([worlds-cloudflare#40](https://github.com/wazootech/worlds-cloudflare/issues/40)).
+
 This package consumes the shared, driver-free SQL plan layer from
 [`@worlds/sqlite/sql-core`](https://jsr.io/@worlds/sqlite) — the FTS5
 sanitizer/stopwords, `buildChunkFtsValue`, `buildSearchResultId`, the
