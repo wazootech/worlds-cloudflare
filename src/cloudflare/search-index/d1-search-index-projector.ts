@@ -2,6 +2,7 @@ import type * as rdfjs from "@rdfjs/types";
 import type { ProjectSearchChunksOptions } from "./project-search-chunks.ts";
 import { projectSearchChunks } from "./project-search-chunks.ts";
 import { rebuildD1SearchIndexFromQuads } from "./rebuild-d1-search-index-from-quads.ts";
+import type { VectorSyncReport } from "./vector-sync-report.ts";
 
 export interface D1SearchIndexProjectorOptions
   extends ProjectSearchChunksOptions {
@@ -24,14 +25,15 @@ export class D1SearchIndexProjector {
   public async projectNovelQuads(
     novelInsertions: rdfjs.Quad[],
     novelQuadIds: string[],
-  ): Promise<void> {
+  ): Promise<VectorSyncReport | undefined> {
     if (novelQuadIds.length > 0) {
-      await projectSearchChunks(
+      return await projectSearchChunks(
         novelInsertions,
         novelQuadIds,
         this.options,
       );
     }
+    return undefined;
   }
 
   /**
