@@ -200,6 +200,8 @@ async function buildChunkStatements(
         }),
         vector,
         metadata: {
+          // VectorizeVectorSearchIndex stamps and enforces world_id; it is
+          // never constructed without one (worlds-cloudflare#41).
           ...(options.worldId ? { world_id: options.worldId } : {}),
           subject: chunk.subject,
           predicate: chunk.predicate,
