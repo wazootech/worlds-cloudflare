@@ -106,7 +106,9 @@ export function checkVectorizeIndex(
     );
   } else {
     const type = filterable.indexType ?? filterable.index_type;
-    if (type !== VECTORIZE_FILTERABLE_PROPERTY_TYPE) {
+    // wrangler reports the type capitalized ("String"); create-metadata-index
+    // takes it lowercase, so compare case-insensitively.
+    if (type?.toLowerCase() !== VECTORIZE_FILTERABLE_PROPERTY_TYPE) {
       problems.push(
         `metadata index ${VECTORIZE_FILTERABLE_PROPERTY} on "${expectation.name}" has type ${type}, expected ${VECTORIZE_FILTERABLE_PROPERTY_TYPE}`,
       );

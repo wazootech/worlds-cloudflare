@@ -38,6 +38,15 @@ Deno.test("a conforming index has no problems", () => {
   );
 });
 
+Deno.test("wrangler's capitalized property type is accepted", () => {
+  assertEquals(
+    checkVectorizeIndex({ name: NAME }, good, [
+      { propertyName: "world_id", indexType: "String" },
+    ]),
+    [],
+  );
+});
+
 Deno.test("a missing index fails loudly with the provisioning commands", () => {
   const [problem, ...rest] = checkVectorizeIndex({ name: NAME }, undefined, []);
   assertEquals(rest, []);
