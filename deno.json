@@ -42,6 +42,7 @@
     "lint": "deno lint",
     "check": "deno check",
     "test": "deno test --allow-all",
+    "vectorize:verify": "deno run --allow-run --allow-env --allow-read scripts/verify-vectorize.ts",
     "publish:dry": "deno publish --dry-run --allow-dirty",
     "ci": {
       "description": "Formats, lints, checks, and tests the code",

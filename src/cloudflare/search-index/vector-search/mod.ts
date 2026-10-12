@@ -8,3 +8,4 @@ export type {
 } from "./vector-search-index.ts";
 export { VectorizeVectorSearchIndex } from "./vectorize-vector-search-index.ts";
 export { FakeVectorSearchIndex } from "./fake-vector-search-index.ts";
+export * from "./vectorize-provisioning.ts";
