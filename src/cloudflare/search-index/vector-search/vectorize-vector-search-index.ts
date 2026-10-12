@@ -5,12 +5,13 @@ import type {
   VectorSearchIndex,
   VectorSearchQueryOptions,
 } from "./vector-search-index.ts";
+import { VECTORIZE_FILTERABLE_PROPERTY } from "./vectorize-provisioning.ts";
 
 /** RESULT_ID_KEY is the metadata key carrying the contract search-result id. */
 const RESULT_ID_KEY = "result_id";
 
 /** WORLD_ID_KEY is the filterable metadata key that scopes vectors per world. */
-const WORLD_ID_KEY = "world_id";
+const WORLD_ID_KEY = VECTORIZE_FILTERABLE_PROPERTY;
 
 /**
  * VectorizeVectorSearchIndex implements VectorSearchIndex over a Cloudflare
