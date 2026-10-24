@@ -45,6 +45,9 @@ export interface D1RdfjsStoreOptions {
 
   /** worldId scopes all reads and writes when schema has a world_id column. */
   worldId?: string;
+
+  /** requireDerivedColumn makes ensureSchema verify `quads.derived` (inference). */
+  requireDerivedColumn?: boolean;
 }
 
 /**
@@ -148,6 +151,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
   private readonly lookupChunkSize: number;
   private readonly schemaBuilder: D1SchemaBuilder;
   private readonly worldId?: string;
+  private readonly requireDerivedColumn: boolean;
   /** serialized write queue: every mutation runs after the previous one. */
   private mutationQueue: Promise<void> = Promise.resolve();
   /** synchronous size approximation, refreshed after every write. */
@@ -163,6 +167,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     this.schemaBuilder = options.schemaBuilder ??
       new D1SchemaBuilder(32, { worldId: options.worldId });
     this.worldId = options.worldId;
+    this.requireDerivedColumn = options.requireDerivedColumn ?? false;
   }
 
   /**
@@ -182,6 +187,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     if (existingTables.rows.length > 0) {
       await assertD1SchemaCompatible(this.connection, {
         worldId: this.worldId,
+        requireDerivedColumn: this.requireDerivedColumn,
       });
     }
 
@@ -205,6 +211,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     // failed verification pass every later boot on the version check alone.
     await assertD1SchemaCompatible(this.connection, {
       worldId: this.worldId,
+      requireDerivedColumn: this.requireDerivedColumn,
     });
     await this.connection.execute({
       sql:
@@ -213,6 +220,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     });
     await assertD1SchemaCompatible(this.connection, {
       worldId: this.worldId,
+      requireDerivedColumn: this.requireDerivedColumn,
     });
     await this.refreshCount();
   }

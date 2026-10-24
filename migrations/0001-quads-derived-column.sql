@@ -1,0 +1,12 @@
+-- Adds quads.derived for worlds that opt in to inference (worlds-cloudflare).
+--
+-- 0 = asserted, 1 = materialized by the reasoner. Every existing row is
+-- asserted, so the default is correct for the data already stored. Databases
+-- created by this version or later already have the column; run this only
+-- against an older database, once, before enabling `inference` for a world:
+--
+--   wrangler d1 execute <DB_NAME> --file migrations/0001-quads-derived-column.sql
+--
+-- SQLite has no ADD COLUMN IF NOT EXISTS: running it twice fails with
+-- "duplicate column name", which leaves the schema unchanged.
+ALTER TABLE quads ADD COLUMN derived INTEGER NOT NULL DEFAULT 0;
