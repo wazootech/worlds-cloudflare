@@ -81,6 +81,7 @@ export async function createCloudflareWorldsSdk(
     maxWriteBatchSize: options.maxWriteBatchSize,
     schemaBuilder: schema,
     worldId: options.worldId,
+    requireDerivedColumn: options.inference?.enabled === true,
   });
 
   await d1RdfjsStore.ensureSchema();

@@ -10,12 +10,21 @@ import {
 } from "@/cloudflare/d1/d1-batch-executor.ts";
 import {
   buildBulkInsertQuads,
+  buildDeleteDerivedQuadsByQuadIds,
   buildDeleteQuadsByQuadIds,
   buildSelectExistingQuadIds,
   buildWipeAllGraphDataStatements,
   type InsertQuadRow,
 } from "@/cloudflare/quad-store/d1-quad-query-builder.ts";
 import { quadToInsertRow } from "@/cloudflare/d1/d1-quad-row.ts";
+import {
+  DEFAULT_MAX_ASSERTED_QUADS,
+  loadAssertedQuads,
+} from "@/cloudflare/inference/load-asserted-quads.ts";
+import {
+  type InferencePlan,
+  planInference,
+} from "@/cloudflare/inference/inference-planner.ts";
 
 export interface CommitPatchToD1Options extends D1ClientBaseOptions {
   /** connection is the D1ConnectionDriver wrapping the D1 binding. */
@@ -31,6 +40,16 @@ export interface CommitPatchToD1Options extends D1ClientBaseOptions {
 export interface CommitPatchToD1Result {
   novelInsertions: rdfjs.Quad[];
   novelQuadIds: string[];
+
+  /**
+   * inference summarizes the inferred rows this commit wrote. Absent when the
+   * world has not opted in.
+   */
+  inference?: {
+    derivedInserted: number;
+    derivedRemoved: number;
+    inconsistencies: InferencePlan["inconsistencies"];
+  };
 }
 
 /**
@@ -77,6 +96,25 @@ export async function commitPatchToD1(
   const targetedDeletions = patch.deletions?.filter(matcher) ?? [];
   const targetedInsertions = patch.insertions?.filter(matcher) ?? [];
 
+  // Inference runs before any write so a size-guard failure leaves the world
+  // untouched. It reads the asserted quads as they are after any replace wipe.
+  const inference = options.inference?.enabled ? options.inference : undefined;
+  let plan: InferencePlan | undefined;
+  if (inference) {
+    const assertedBefore = await loadAssertedQuads(connection, {
+      worldId,
+      maxAssertedQuads: inference.maxAssertedQuads ??
+        DEFAULT_MAX_ASSERTED_QUADS,
+      pendingInsertions: targetedInsertions.length,
+    });
+    plan = planInference({
+      assertedBefore,
+      deletions: targetedDeletions,
+      insertions: targetedInsertions,
+      graphs: inference.graphs,
+    });
+  }
+
   const deletionQuadIds = new Set<string>();
   if (targetedDeletions.length) {
     const computedDeletionQuadIds = await hashQuads(targetedDeletions);
@@ -93,6 +131,15 @@ export async function commitPatchToD1(
     }
   }
 
+  if (plan && plan.derivedToRemove.length > 0) {
+    await stageChunked(
+      batchExecutor,
+      await hashQuads(plan.derivedToRemove),
+      lookupChunkSize,
+      (chunk) => [buildDeleteDerivedQuadsByQuadIds(chunk, worldId)],
+    );
+  }
+
   const novelInsertions: rdfjs.Quad[] = [];
   const novelQuadIds: string[] = [];
 
@@ -103,6 +150,7 @@ export async function commitPatchToD1(
       proposedQuadIds,
       lookupChunkSize,
       worldId,
+      inference !== undefined,
     );
 
     for (let i = 0; i < targetedInsertions.length; i++) {
@@ -127,10 +175,31 @@ export async function commitPatchToD1(
       }
       await batchExecutor.stage(
         buildBulkInsertQuads(
-          novelRows.map((row) => ({ ...row, world_id: worldId })),
+          novelRows.map((row) => ({
+            ...row,
+            world_id: worldId,
+            ...(inference && { derived: 0 as const }),
+          })),
         ),
       );
     }
+  }
+
+  let derivedInserted = 0;
+  if (plan) {
+    // OR IGNORE: a quad that is asserted (now or already) stays asserted.
+    const derivedRows: InsertQuadRow[] = [];
+    const seen = new Set<string>();
+    for (const quad of [...plan.derivedToAdd, ...plan.entailedDeletions]) {
+      const row = await quadToInsertRow(quad);
+      if (seen.has(row.quad_id)) continue;
+      seen.add(row.quad_id);
+      derivedRows.push({ ...row, world_id: worldId, derived: 1 });
+    }
+    derivedInserted = derivedRows.length;
+    await batchExecutor.stage(
+      buildBulkInsertQuads(derivedRows, { orIgnore: true }),
+    );
   }
 
   try {
@@ -140,7 +209,17 @@ export async function commitPatchToD1(
     throw new Error(`failed to execute D1 batch: ${detail}`, { cause });
   }
 
-  return { novelInsertions, novelQuadIds };
+  return {
+    novelInsertions,
+    novelQuadIds,
+    ...(plan && {
+      inference: {
+        derivedInserted,
+        derivedRemoved: plan.derivedToRemove.length,
+        inconsistencies: plan.inconsistencies,
+      },
+    }),
+  };
 }
 
 async function stageChunked(
@@ -160,12 +239,13 @@ async function queryCachePresence(
   quadIds: string[],
   lookupChunkSize: number,
   worldId?: string,
+  assertedOnly = false,
 ): Promise<Set<string>> {
   const cachedIds = new Set<string>();
   for (let index = 0; index < quadIds.length; index += lookupChunkSize) {
     const chunk = quadIds.slice(index, index + lookupChunkSize);
     const result = await connection.execute(
-      buildSelectExistingQuadIds(chunk, worldId),
+      buildSelectExistingQuadIds(chunk, worldId, { assertedOnly }),
     );
     for (const row of result.rows) {
       if (row.id) {

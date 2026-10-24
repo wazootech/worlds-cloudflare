@@ -22,3 +22,5 @@ export { D1QuadStream } from "./rdfjs-store/d1-quad-stream.ts";
 export { D1QuadStore } from "./quad-store/mod.ts";
 export type { D1QuadStoreOptions } from "./quad-store/mod.ts";
 export * from "./search-index/mod.ts";
+export type { InferenceOptions } from "./d1-client-base-options.ts";
+export { InferenceSizeGuardError } from "./inference/load-asserted-quads.ts";
