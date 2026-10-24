@@ -6,7 +6,9 @@
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@std/internal@^1.0.14": "1.0.14",
     "jsr:@std/path@^1.1.5": "1.1.6",
-    "jsr:@wazoo/sparql-engine@~0.4.1": "0.4.1",
+    "jsr:@wazoo/reasoner@0.4": "0.4.0",
+    "jsr:@wazoo/sparql-engine@0.4.4": "0.4.4",
+    "jsr:@wazoo/sparql-engine@~0.4.1": "0.4.4",
     "jsr:@worlds/client@0.1": "0.1.0",
     "jsr:@worlds/sdk@0.6": "0.6.1",
     "jsr:@worlds/sdk@0.9": "0.9.0",
@@ -38,8 +40,21 @@
         "jsr:@std/internal@^1.0.14"
       ]
     },
+    "@wazoo/reasoner@0.4.0": {
+      "integrity": "58ab87f4d5572fe8fe32db0c0698b140455aea292edcffc33d7f5e528377db9c",
+      "dependencies": [
+        "jsr:@wazoo/sparql-engine@0.4.4",
+        "npm:@rdfjs/types"
+      ]
+    },
     "@wazoo/sparql-engine@0.4.1": {
       "integrity": "6881bda5e45aaf8bac2cd87f8b43db5db51d307fccbffc1cd4edaa46454f9bd7",
+      "dependencies": [
+        "npm:@rdfjs/types"
+      ]
+    },
+    "@wazoo/sparql-engine@0.4.4": {
+      "integrity": "a3c88d00fddf13ca078321463e554d52c8d8e8d083adfcd2df08e7b9bd289c53",
       "dependencies": [
         "npm:@rdfjs/types"
       ]
@@ -51,7 +66,7 @@
       "integrity": "12a1ba2d69322b13e1b271c00e9c7873cd4d5aca8b08b681f40fa004808067d6",
       "dependencies": [
         "jsr:@std/encoding",
-        "jsr:@wazoo/sparql-engine",
+        "jsr:@wazoo/sparql-engine@~0.4.1",
         "npm:@rdfjs/types"
       ]
     },
@@ -60,7 +75,7 @@
       "dependencies": [
         "jsr:@std/encoding",
         "jsr:@std/path",
-        "jsr:@wazoo/sparql-engine",
+        "jsr:@wazoo/sparql-engine@~0.4.1",
         "jsr:@worlds/client",
         "npm:@rdfjs/types",
         "npm:@tensorflow/tfjs",
@@ -71,7 +86,7 @@
     "@worlds/sqlite@0.6.0": {
       "integrity": "3b5210b0b9e1c4926f7caa6f28e1b492a680228c61d3da36d4af2ae3508abf95",
       "dependencies": [
-        "jsr:@wazoo/sparql-engine",
+        "jsr:@wazoo/sparql-engine@~0.4.1",
         "jsr:@worlds/sdk@0.6",
         "npm:@langchain/textsplitters",
         "npm:@rdfjs/types",
@@ -957,6 +972,7 @@
   "workspace": {
     "dependencies": [
       "jsr:@std/assert@^1.0.19",
+      "jsr:@wazoo/reasoner@0.4",
       "jsr:@wazoo/sparql-engine@~0.4.1",
       "jsr:@worlds/sdk@0.9",
       "jsr:@worlds/sqlite@0.6",
