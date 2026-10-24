@@ -3,6 +3,7 @@ import { filterQuads } from "@worlds/sdk/quad-store";
 import { quadFromD1Row } from "@/cloudflare/d1/d1-quad-row.ts";
 import {
   buildMatchQuadsQuery,
+  buildSelectAssertedQuadsPage,
   DEFAULT_D1_MATCH_PAGE_SIZE,
 } from "@/cloudflare/quad-store/d1-quad-query-builder.ts";
 import {
@@ -62,11 +63,18 @@ export async function rebuildD1SearchIndexFromQuads(
   let afterQuadId: string | undefined;
 
   for (;;) {
-    const query = buildMatchQuadsQuery(
-      { subject: null, predicate: null, object: null, graph: null },
-      { afterQuadId, limit: pageSize },
-      searchQueryBuilder.worldId,
-    );
+    // Inferred rows are not indexed: they are rebuildable from asserted ones,
+    // and indexing them would put entailed copies in search results.
+    const query = options.inference?.enabled
+      ? buildSelectAssertedQuadsPage(
+        { afterQuadId, limit: pageSize },
+        searchQueryBuilder.worldId,
+      )
+      : buildMatchQuadsQuery(
+        { subject: null, predicate: null, object: null, graph: null },
+        { afterQuadId, limit: pageSize },
+        searchQueryBuilder.worldId,
+      );
     const resultSet = await connection.execute(query);
 
     if (resultSet.rows.length === 0) {

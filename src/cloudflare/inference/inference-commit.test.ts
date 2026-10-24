@@ -271,3 +271,14 @@ Deno.test("enabling inference on a database without quads.derived fails closed",
     await substrate.dispose();
   }
 });
+
+Deno.test("enabled: reindex skips inferred rows", async () => {
+  await withWorld(on, async ({ sdk, update }) => {
+    await update(
+      `INSERT DATA { ex:Dog rdfs:subClassOf ex:Animal . ex:rex a ex:Dog ; rdfs:label "Rex the dog" . }`,
+    );
+    const report = await sdk.reindex();
+    // Three asserted quads; the inferred `ex:rex a ex:Animal` is not read.
+    assertEquals(report.processedQuadCount, 3);
+  });
+});
