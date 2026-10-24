@@ -55,6 +55,47 @@ UID-era tables or preserve their rows. Reset each target D1 from its canonical
 schema before deploying this breaking release; startup rejects an incompatible
 schema instead of changing it in place.
 
+## Inference (opt-in, experimental)
+
+A world can opt in to OWL 2 RL materialization with
+[`@wazoo/reasoner`](https://jsr.io/@wazoo/reasoner). It is off by default; a
+world that does not set `inference` behaves exactly as before.
+
+```ts
+const sdk = await createCloudflareWorldsSdk({
+  database: env.DB,
+  worldId,
+  inference: { enabled: true }, // graphs: "per-graph" (default) | "union"
+});
+```
+
+- **Storage.** Inferred quads are stored in `quads` with `derived = 1`; asserted
+  quads have `derived = 0`. A quad that is both is stored once, as asserted.
+  Inferred quads are visible to SPARQL and export like any other. They are not
+  chunked for search on commit.
+- **Write path.** Each commit loads the world's asserted quads, rebuilds a
+  `Reasoner`, then uses `retract` for deletions and `extend` for insertions to
+  get exactly the inferred rows to remove and add. Removal only ever deletes
+  `derived = 1` rows. Retracting an asserted quad that is still entailed keeps
+  it as a derived row.
+- **Named graphs.** Default `"per-graph"`: entailment sees every graph; an
+  inferred quad is listed in the graph(s) that entail it alone, else in
+  `https://wazoo.dev/ns/reasoner#derived`. `"union"` lists everything in the
+  default graph.
+- **Limits.** The reasoner has no serialize/restore, so every commit costs a
+  read and run over all asserted quads. `maxAssertedQuads` (default 100000)
+  fails a commit with `InferenceSizeGuardError`, before any write, when the
+  world is larger. Commits that go through `D1RdfjsStore` directly (not the SDK
+  or SPARQL update) do not infer. `include`/`exclude` filters narrow the patch,
+  not the reasoning input.
+- **Enabling on an existing world.** Add the column with
+  `migrations/0001-quads-derived-column.sql` (or start from an empty database).
+  Existing data is not back-filled: inferred rows appear only for later changes,
+  so enable it on a new or freshly imported (`mode: "replace"`) world.
+- **Inconsistencies.** `commitPatchToD1` returns the reasoner's
+  `inconsistencies`; they do not block the write. SHACL validation does not
+  exist in this package; if added, it must run after inference.
+
 ## Install
 
 ### Package managers
