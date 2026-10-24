@@ -4,6 +4,31 @@ import type { EmbeddingService } from "@worlds/sdk/search-index/embedding-servic
 import type { TextSplitterInterface } from "@worlds/sdk/search-index/quad-chunker";
 
 /**
+ * InferenceOptions turns on OWL 2 RL materialization for one world. Off by
+ * default: without it the commit path is unchanged and `quads.derived` is not
+ * required.
+ */
+export interface InferenceOptions {
+  /** enabled opts the world in. `{ enabled: false }` is the same as omitting it. */
+  enabled: boolean;
+
+  /**
+   * graphs is the reasoner's named-graph mode. `"per-graph"` (default) lists
+   * each entailed quad in the graph(s) that entail it alone, else in
+   * `https://wazoo.dev/ns/reasoner#derived`; `"union"` merges all graphs and
+   * lists everything in the default graph.
+   */
+  graphs?: "per-graph" | "union";
+
+  /**
+   * maxAssertedQuads is the size guard (default 100000). Each commit rebuilds
+   * the reasoner from the world's asserted quads, so a commit that would
+   * exceed it fails before writing instead of exhausting the isolate.
+   */
+  maxAssertedQuads?: number;
+}
+
+/**
  * D1ClientBaseOptions lists configuration shared by quad index Cloudflare D1 client factories.
  */
 export interface D1ClientBaseOptions extends QuadFilter {
@@ -37,4 +62,10 @@ export interface D1ClientBaseOptions extends QuadFilter {
    * - `"disabled"`: skips chunking entirely; caller calls `client.reindex()` before searching.
    */
   searchIndexOnImport?: SearchIndexOnImport;
+
+  /**
+   * inference opts this world in to OWL 2 RL materialization on write. Needs
+   * the `quads.derived` column (see migrations/0001-quads-derived-column.sql).
+   */
+  inference?: InferenceOptions;
 }

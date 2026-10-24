@@ -11,6 +11,18 @@ export interface D1SchemaCompatibilityReport {
   schemaVersion: number | null;
 }
 
+export interface D1SchemaCompatibilityOptions {
+  worldId?: string;
+
+  /**
+   * requireDerivedColumn also requires `quads.derived`. Databases created
+   * before inference existed lack it; add it with
+   * `migrations/0001-quads-derived-column.sql`. Worlds that do not opt in to
+   * inference never need it, so the schema version is unchanged.
+   */
+  requireDerivedColumn?: boolean;
+}
+
 export const D1_DATA_PLANE_SCHEMA_VERSION = 4;
 const SCHEMA_VERSION_TABLE = "worlds_data_plane_schema";
 
@@ -48,7 +60,7 @@ const REQUIRED_PRIMARY_KEYS: Record<string, string> = {
 /** Inspect the actual D1 schema and report missing required tables or columns. */
 export async function checkD1SchemaCompatibility(
   connection: D1ConnectionDriver,
-  options: { worldId?: string } = {},
+  options: D1SchemaCompatibilityOptions = {},
 ): Promise<D1SchemaCompatibilityReport> {
   const issues: D1SchemaCompatibilityIssue[] = [];
   let schemaVersion: number | null = null;
@@ -120,7 +132,13 @@ export async function checkD1SchemaCompatibility(
   const requiredColumns = Object.fromEntries(
     Object.entries(REQUIRED_COLUMNS).map(([table, columns]) => [
       table,
-      options.worldId ? [...columns, "world_id"] : columns,
+      [
+        ...columns,
+        ...(options.worldId ? ["world_id"] : []),
+        ...(options.requireDerivedColumn && table === "quads"
+          ? ["derived"]
+          : []),
+      ],
     ]),
   );
   for (const [table, columns] of Object.entries(requiredColumns)) {
@@ -205,7 +223,7 @@ export async function checkD1SchemaCompatibility(
 /** Validate the schema and throw an actionable error before serving traffic. */
 export async function assertD1SchemaCompatible(
   connection: D1ConnectionDriver,
-  options: { worldId?: string } = {},
+  options: D1SchemaCompatibilityOptions = {},
 ): Promise<void> {
   const report = await checkD1SchemaCompatibility(connection, options);
   if (!report.compatible) {
@@ -215,7 +233,9 @@ export async function assertD1SchemaCompatible(
     throw new Error(
       `D1 schema is incompatible with @worlds/cloudflare: ${issues}. ` +
         `Automatic schema creation is not an in-place migration. Apply the ` +
-        `documented clean reset before serving traffic.`,
+        `documented clean reset before serving traffic (a missing quads.derived ` +
+        `column, needed only for inference, is added by ` +
+        `migrations/0001-quads-derived-column.sql).`,
     );
   }
 }

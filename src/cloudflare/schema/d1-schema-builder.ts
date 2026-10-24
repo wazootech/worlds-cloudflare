@@ -65,8 +65,13 @@ export class D1SchemaBuilder {
     ];
   }
 
+  /**
+   * buildD1QuadsTable creates the quads table. `derived` is 0 for an asserted
+   * quad and 1 for a quad materialized by inference; a quad that is both
+   * asserted and derived is stored once, as asserted.
+   */
   public buildD1QuadsTable(): string {
-    return `CREATE TABLE IF NOT EXISTS quads (quad_id TEXT PRIMARY KEY, s TEXT NOT NULL, s_type TEXT NOT NULL, p TEXT NOT NULL, o TEXT NOT NULL, o_type TEXT NOT NULL, o_datatype TEXT, o_lang TEXT, g TEXT NOT NULL, g_type TEXT NOT NULL${
+    return `CREATE TABLE IF NOT EXISTS quads (quad_id TEXT PRIMARY KEY, s TEXT NOT NULL, s_type TEXT NOT NULL, p TEXT NOT NULL, o TEXT NOT NULL, o_type TEXT NOT NULL, o_datatype TEXT, o_lang TEXT, g TEXT NOT NULL, g_type TEXT NOT NULL, derived INTEGER NOT NULL DEFAULT 0${
       this.worldId ? ", world_id TEXT NOT NULL" : ""
     })`;
   }
