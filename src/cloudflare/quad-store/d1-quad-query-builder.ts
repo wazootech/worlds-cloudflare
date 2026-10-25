@@ -97,6 +97,18 @@ export function buildDeleteDerivedQuadsByQuadIds(
   };
 }
 
+/** buildDeleteAllDerivedQuads removes every inferred row, never an asserted one. */
+export function buildDeleteAllDerivedQuads(
+  worldId?: string,
+): { sql: string; args: string[] } {
+  return {
+    sql: `DELETE FROM quads WHERE derived = 1${
+      worldId ? " AND world_id = ?" : ""
+    }`,
+    args: worldId ? [worldId] : [],
+  };
+}
+
 /** buildSelectExistingQuadIds finds stored ids; `assertedOnly` ignores inferred rows. */
 export function buildSelectExistingQuadIds(
   quadIds: string[],

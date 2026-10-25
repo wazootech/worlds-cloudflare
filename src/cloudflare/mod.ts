@@ -24,3 +24,8 @@ export type { D1QuadStoreOptions } from "./quad-store/mod.ts";
 export * from "./search-index/mod.ts";
 export type { InferenceOptions } from "./d1-client-base-options.ts";
 export { InferenceSizeGuardError } from "./inference/load-asserted-quads.ts";
+export { backfillInference } from "./inference/backfill-inference.ts";
+export type {
+  BackfillInferenceOptions,
+  BackfillInferenceReport,
+} from "./inference/backfill-inference.ts";
