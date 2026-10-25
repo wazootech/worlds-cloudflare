@@ -94,8 +94,13 @@ const sdk = await createCloudflareWorldsSdk({
   after `0001`; new databases get the `(world_id, quad_id)` key.
 - **Enabling on an existing world.** Add the column with
   `migrations/0001-quads-derived-column.sql` (or start from an empty database).
-  Existing data is not back-filled: inferred rows appear only for later changes,
-  so enable it on a new or freshly imported (`mode: "replace"`) world.
+  Enabling alone does not back-fill: inferred rows appear only for later
+  changes. To materialize inference for data already stored, call
+  `backfillInference({ database, worldId, inference })`. It runs the reasoner
+  once over the asserted quads, clears the world's inferred rows, writes the
+  closure, and reports counts and inconsistencies. It is idempotent, honors
+  `maxAssertedQuads` before any write, and never touches asserted rows. The
+  clear and the writes are separate batches, so after a failure run it again.
 - **Inconsistencies.** `commitPatchToD1` returns the reasoner's
   `inconsistencies`; they do not block the write. SHACL validation does not
   exist in this package; if added, it must run after inference.
