@@ -51,10 +51,16 @@ const REQUIRED_COLUMNS: Record<string, string[]> = {
   ],
 };
 
-const REQUIRED_PRIMARY_KEYS: Record<string, string> = {
-  [SCHEMA_VERSION_TABLE]: "schema_version_id",
-  quads: "quad_id",
-  chunks: "chunk_id",
+/**
+ * REQUIRED_PRIMARY_KEYS lists the accepted primary-key column sets per table.
+ * `quads` accepts the legacy quad_id key so a Worker deployed before
+ * migrations/0002-quads-world-scoped-key.sql has run still starts; only the
+ * composite (world_id, quad_id) key isolates worlds that hold the same triple.
+ */
+const REQUIRED_PRIMARY_KEYS: Record<string, string[][]> = {
+  [SCHEMA_VERSION_TABLE]: [["schema_version_id"]],
+  quads: [["quad_id"], ["quad_id", "world_id"]],
+  chunks: [["chunk_id"]],
 };
 
 /** Inspect the actual D1 schema and report missing required tables or columns. */
@@ -97,7 +103,7 @@ export async function checkD1SchemaCompatibility(
     if (
       versionPrimaryKeys.length !== 1 ||
       versionPrimaryKeys[0]?.name !==
-        REQUIRED_PRIMARY_KEYS[SCHEMA_VERSION_TABLE]
+        REQUIRED_PRIMARY_KEYS[SCHEMA_VERSION_TABLE]![0]![0]
     ) {
       const found = versionPrimaryKeys.map((column) =>
         column.name
@@ -106,7 +112,7 @@ export async function checkD1SchemaCompatibility(
       issues.push({
         table: SCHEMA_VERSION_TABLE,
         detail: `expected primary key ${
-          REQUIRED_PRIMARY_KEYS[SCHEMA_VERSION_TABLE]
+          REQUIRED_PRIMARY_KEYS[SCHEMA_VERSION_TABLE]![0]![0]
         }, found ${found}`,
       });
     }
@@ -169,11 +175,16 @@ export async function checkD1SchemaCompatibility(
     const primaryKeys = columnResult.rows.filter(
       (column) => Number(column.pk) > 0,
     );
-    const expectedPrimaryKey = REQUIRED_PRIMARY_KEYS[table];
+    const expectedPrimaryKeys = REQUIRED_PRIMARY_KEYS[table] ?? [];
+    const actualKey = primaryKeys.map((column) => column.name).sort().join(",");
     if (
-      primaryKeys.length !== 1 ||
-      primaryKeys[0]?.name !== expectedPrimaryKey
+      !expectedPrimaryKeys.some((key) =>
+        [...key].sort().join(",") === actualKey
+      )
     ) {
+      const expectedPrimaryKey = expectedPrimaryKeys
+        .map((key) => key.join(" + "))
+        .join(" or ");
       const found = primaryKeys.map((column) => column.name).join(", ") ||
         "none";
       issues.push({

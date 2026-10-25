@@ -14,7 +14,7 @@ Deno.test("runtime D1 DDL uses canonical primary and reference columns", async (
 
     for (
       const [table, expectedKey] of [
-        ["quads", "quad_id"],
+        ["quads", "quad_id,world_id"],
         ["chunks", "chunk_id"],
         ["worlds_data_plane_schema", "schema_version_id"],
       ]
@@ -26,8 +26,8 @@ Deno.test("runtime D1 DDL uses canonical primary and reference columns", async (
       assertEquals(
         columns.rows.filter((column) => column.pk > 0).map((column) =>
           column.name
-        ),
-        [expectedKey],
+        ).sort().join(","),
+        expectedKey,
         `${table} primary key`,
       );
       assertEquals(columns.rows.some((column) => column.name === "id"), false);
