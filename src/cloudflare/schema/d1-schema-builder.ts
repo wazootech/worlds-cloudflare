@@ -71,8 +71,14 @@ export class D1SchemaBuilder {
    * asserted and derived is stored once, as asserted.
    */
   public buildD1QuadsTable(): string {
-    return `CREATE TABLE IF NOT EXISTS quads (quad_id TEXT PRIMARY KEY, s TEXT NOT NULL, s_type TEXT NOT NULL, p TEXT NOT NULL, o TEXT NOT NULL, o_type TEXT NOT NULL, o_datatype TEXT, o_lang TEXT, g TEXT NOT NULL, g_type TEXT NOT NULL, derived INTEGER NOT NULL DEFAULT 0${
-      this.worldId ? ", world_id TEXT NOT NULL" : ""
+    // In a shared database quad_id is a hash of the quad alone, so two worlds
+    // holding the same triple would share one row. Scope the key by world.
+    return `CREATE TABLE IF NOT EXISTS quads (quad_id TEXT${
+      this.worldId ? "" : " PRIMARY KEY"
+    }, s TEXT NOT NULL, s_type TEXT NOT NULL, p TEXT NOT NULL, o TEXT NOT NULL, o_type TEXT NOT NULL, o_datatype TEXT, o_lang TEXT, g TEXT NOT NULL, g_type TEXT NOT NULL, derived INTEGER NOT NULL DEFAULT 0${
+      this.worldId
+        ? ", world_id TEXT NOT NULL, PRIMARY KEY (world_id, quad_id)"
+        : ""
     })`;
   }
 

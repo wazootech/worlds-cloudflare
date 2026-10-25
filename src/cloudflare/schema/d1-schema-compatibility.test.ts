@@ -61,7 +61,8 @@ Deno.test("D1 schema compatibility reports missing tables and columns", async ()
     );
     assertEquals(
       partial.issues.some((issue) =>
-        issue.detail === "expected primary key quad_id, found id"
+        issue.detail ===
+          "expected primary key quad_id or quad_id + world_id, found id"
       ),
       true,
     );

@@ -88,6 +88,10 @@ const sdk = await createCloudflareWorldsSdk({
   world is larger. Commits that go through `D1RdfjsStore` directly (not the SDK
   or SPARQL update) do not infer. `include`/`exclude` filters narrow the patch,
   not the reasoning input.
+- **Shared databases.** Before 0.12.0 a world-scoped `quads` table keyed rows by
+  `quad_id` alone, so two worlds holding the same triple shared one row (#60).
+  Existing databases need `migrations/0002-quads-world-scoped-key.sql`, run
+  after `0001`; new databases get the `(world_id, quad_id)` key.
 - **Enabling on an existing world.** Add the column with
   `migrations/0001-quads-derived-column.sql` (or start from an empty database).
   Existing data is not back-filled: inferred rows appear only for later changes,
