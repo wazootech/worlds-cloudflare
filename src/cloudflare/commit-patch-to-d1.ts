@@ -82,7 +82,12 @@ export async function commitPatchToD1(
     exclude,
     worldId,
   } = options;
-  const lookupChunkSize = maxLookupChunkSize ?? 100;
+  // The documented cap is host parameters per statement; world-scoped
+  // statements also bind world_id, so reserve one slot for it.
+  const lookupChunkSize = Math.max(
+    1,
+    (maxLookupChunkSize ?? 100) - (worldId ? 1 : 0),
+  );
   const writeBatchSize = maxWriteBatchSize ?? DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
 
   const batchExecutor = new D1BatchExecutor({ connection, writeBatchSize });
