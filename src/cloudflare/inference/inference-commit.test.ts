@@ -282,3 +282,52 @@ Deno.test("enabled: reindex skips inferred rows", async () => {
     assertEquals(report.processedQuadCount, 3);
   });
 });
+
+Deno.test("world-scoped statements stay within D1's 100 bound-variable cap", async () => {
+  const substrate = await createTestD1();
+  try {
+    let widest = 0;
+    const real = new WeakMap<object, unknown>();
+    const wrap = (
+      statement: ReturnType<typeof substrate.database.prepare>,
+    ): ReturnType<typeof substrate.database.prepare> => {
+      const wrapped = {
+        bind(...values: unknown[]) {
+          widest = Math.max(widest, values.length);
+          return wrap(statement.bind(...values));
+        },
+        all: () => statement.all(),
+        first: () => statement.first(),
+        run: () => statement.run(),
+      };
+      real.set(wrapped, statement);
+      return wrapped as never;
+    };
+    const database = {
+      prepare: (sql: string) => wrap(substrate.database.prepare(sql)),
+      batch: (statements: unknown[]) =>
+        substrate.database.batch(
+          statements.map((s) => real.get(s as object)) as never,
+        ),
+      exec: (sql: string) => substrate.database.exec(sql),
+    };
+    const sdk = await createCloudflareWorldsSdk({
+      database: database as unknown as typeof substrate.database,
+      searchIndexOnImport: "disabled",
+      worldId: "w1",
+      inference: on,
+    });
+    const link = (i: number) => `ex:C${i} rdfs:subClassOf ex:C${i + 1} .`;
+    const chain = Array.from({ length: 30 }, (_, i) => link(i)).join(" ");
+    await sdk.sparql({ query: `${PREFIX}INSERT DATA { ${chain} }` });
+    // Cutting the middle link retracts well over 100 derived quads at once.
+    await sdk.sparql({ query: `${PREFIX}DELETE DATA { ${link(15)} }` });
+    const left = await substrate.connection.execute<{ n: number }>({
+      sql: "SELECT COUNT(*) AS n FROM quads WHERE derived = 1",
+    });
+    assertEquals(Number(left.rows[0]!.n), 196);
+    assertEquals(widest <= 100, true, `widest statement bound ${widest}`);
+  } finally {
+    await substrate.dispose();
+  }
+});
