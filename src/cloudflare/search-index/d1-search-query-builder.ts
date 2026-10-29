@@ -1,12 +1,11 @@
 import type { SearchRequest } from "@worlds/sdk/search-index";
 import {
-  buildIncludeExcludeFilterClauses,
-  buildKeywordFtsStatement,
   generatePlaceholders,
   RRF_FUSION_K,
   sanitizeFtsQuery,
 } from "@worlds/sqlite/sql-core";
-import type { ColumnMapping, SqlStatement } from "@worlds/sqlite/sql-core";
+import type { SqlStatement } from "@worlds/sqlite/sql-core";
+import { buildD1KeywordSearchStatement } from "./d1-search-query-sql.ts";
 
 export { sanitizeFtsQuery };
 
@@ -16,13 +15,6 @@ export { sanitizeFtsQuery };
  * @deprecated Import RRF_FUSION_K from @worlds/sqlite/sql-core instead.
  */
 export const RRF_REFERENCE_CONSTANT = RRF_FUSION_K;
-
-/** CHUNKS_TABLE_COLUMNS maps QuadFilter fields to chunks table column names. */
-const CHUNKS_TABLE_COLUMNS: ColumnMapping = {
-  subjects: "chunks.subject",
-  predicates: "chunks.predicate",
-  graphs: "chunks.graph",
-};
 
 /** Maximum embedding dimensions accepted by D1SearchQueryBuilder (Vectorize cap: 1536 float32). */
 const D1_SEARCH_QUERY_BUILDER_MAX_VECTOR_DIMENSIONS = 1536;
@@ -134,44 +126,10 @@ export class D1SearchQueryBuilder {
     request: SearchRequest,
     searchBuildOptions: { limit: number },
   ): SqlStatement {
-    const { limit } = searchBuildOptions;
-
-    const { whereClauses, filterArgs } = buildIncludeExcludeFilterClauses(
+    return buildD1KeywordSearchStatement(
       request,
-      CHUNKS_TABLE_COLUMNS,
+      searchBuildOptions.limit,
+      this.worldId,
     );
-    if (this.worldId) {
-      whereClauses.push("chunks.world_id = ?");
-      filterArgs.push(this.worldId);
-    }
-
-    const whereFilter = whereClauses.length > 0
-      ? `WHERE ${whereClauses.join(" AND ")}`
-      : "";
-
-    const hasQuery = !!request.query && request.query.trim().length > 0;
-    const sanitizedQuery = hasQuery ? sanitizeFtsQuery(request.query) : "";
-    // A present query with zero searchable tokens (pure punctuation, emoji)
-    // must not emit `MATCH ""` — FTS5 crashes on the empty match string.
-    const hasKeyword = sanitizedQuery.length > 0;
-
-    if (hasKeyword) {
-      const statement = buildKeywordFtsStatement({
-        sanitizedQuery,
-        limit,
-        whereFilter,
-        filterArgs,
-      });
-      return {
-        ...statement,
-        sql: statement.sql.replaceAll("chunks.id", "chunks.chunk_id"),
-      };
-    }
-
-    return {
-      sql:
-        "SELECT NULL as subject, NULL as predicate, NULL as graph, NULL as value, 0 as combined_rank WHERE 0 = 1",
-      args: [],
-    };
   }
 }

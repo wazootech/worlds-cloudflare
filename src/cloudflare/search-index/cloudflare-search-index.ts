@@ -1,69 +1,24 @@
 import {
   normalizeRrfScore,
   type ReindexRequest,
-  type ReindexResponse,
   type SearchIndexInterface,
-  type SearchMode,
   type SearchRequest,
   type SearchResponse,
   type SearchResult,
 } from "@worlds/sdk/search-index";
 import { buildSearchResultId } from "@worlds/sqlite/sql-core";
-import type { D1ClientBaseOptions } from "@/cloudflare/d1-client-base-options.ts";
-import type { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
-import type { D1SearchQueryBuilder } from "./d1-search-query-builder.ts";
-import type {
-  VectorSearchHit,
-  VectorSearchIndex,
-} from "./vector-search/mod.ts";
+import type { VectorSearchHit } from "./vector-search/mod.ts";
 import { rebuildD1SearchIndexFromQuads } from "./rebuild-d1-search-index-from-quads.ts";
-import type { VectorSyncReport } from "./vector-sync-report.ts";
+import { fuseRankedLists } from "./cloudflare-search-index-fusion.ts";
+import type {
+  CloudflareReindexResponse,
+  CloudflareSearchIndexOptions,
+} from "./cloudflare-search-index-options.ts";
 
-/**
- * CloudflareReindexResponse is the SDK ReindexResponse plus the vector sync
- * report, so a reindex whose vector half failed is distinguishable from a
- * complete one (worlds-cloudflare#40).
- */
-export interface CloudflareReindexResponse extends ReindexResponse {
-  vectorSync: VectorSyncReport;
-}
-
-/**
- * CloudflareSearchIndexOptions defines the structured configuration and dependency parameters needed to construct the Cloudflare D1 search engine.
- */
-export interface CloudflareSearchIndexOptions extends D1ClientBaseOptions {
-  /** connection is the D1ConnectionDriver wrapping the D1 binding. */
-  connection: D1ConnectionDriver;
-
-  /** worldId scopes the vector query via the world_id metadata filter. */
-  worldId?: string;
-
-  /** searchQueryBuilder must match the schema and commit path used when materializing chunk vectors. */
-  searchQueryBuilder: D1SearchQueryBuilder;
-
-  /**
-   * candidateCount sizes the internal candidate pool at the SQL level — the
-   * number of ranked hits fetched before normalization and post-ranking
-   * minScore filtering. Provider-internal per the hosted search contract
-   * (worlds-api#30 D2); callers pass `max(limit, world.topK)`. Defaults to
-   * `limit` (100).
-   */
-  candidateCount?: number;
-
-  /**
-   * vectorSearch is the outside-D1 vector index (Phase C, worlds-api#1). When
-   * both vectorSearch and an embeddingService are wired, searches become
-   * hybrid (FTS + vector fused by the contract's deterministic ids) and
-   * `mode` reports semantic/hybrid/keyword accordingly.
-   */
-  vectorSearch?: VectorSearchIndex;
-
-  /** limit establishes optional page sizing constraints for search result sets, defaulting to 100. */
-  limit?: number;
-
-  /** maxWriteBatchSize caps statements per D1 batch during reindex (default 500). */
-  maxWriteBatchSize?: number;
-}
+export type {
+  CloudflareReindexResponse,
+  CloudflareSearchIndexOptions,
+} from "./cloudflare-search-index-options.ts";
 
 /**
  * CloudflareSearchIndex implements the query pathway over D1's FTS5
@@ -198,97 +153,4 @@ export class CloudflareSearchIndex implements SearchIndexInterface {
       readPageSize: request?.readPageSize,
     });
   }
-}
-
-interface RankedCandidate {
-  score: number;
-  result: SearchResult;
-}
-
-/**
- * fuseRankedLists merges the keyword and vector ranked lists into the final
- * ranked result set (contract D7, hybrid factor):
- *
- * - Keyword-only: every hit is `rrf` with its normalized keyword rank score.
- * - Vec-only (semantic): every hit is `cosine` with `max(0, cosine)`.
- * - Hybrid: hits present in BOTH lists score the mean of their normalized
- *   keyword and vector ranks (rank 0 in both → 1.0) as `rrf` (fused
- *   reciprocal rank); hits only in the vector list stay `cosine`; hits only
- *   in the keyword list stay `rrf`. Final order is score-descending (stable).
- *
- * `mode` reports what actually ran so consumers never assume semantic.
- */
-function fuseRankedLists(
-  keywordHits: Array<SearchResult & { rankIndex: number }>,
-  vectorHits: VectorSearchHit[],
-): { results: RankedCandidate[]; mode: SearchMode } {
-  if (vectorHits.length === 0) {
-    return {
-      mode: "keyword",
-      results: keywordHits.map((hit) => ({ score: hit.score, result: hit })),
-    };
-  }
-
-  if (keywordHits.length === 0) {
-    const results = vectorHits.map((hit) => ({
-      score: clampCosine(hit.score),
-      result: hitToSearchResult(hit),
-    }));
-    return { mode: "semantic", results };
-  }
-
-  const keywordById = new Map(keywordHits.map((hit) => [hit.id, hit]));
-  const results: RankedCandidate[] = [];
-
-  for (let vectorRank = 0; vectorRank < vectorHits.length; vectorRank++) {
-    const hit = vectorHits[vectorRank];
-    const keywordMatch = keywordById.get(hit.id);
-    if (keywordMatch) {
-      // Present in both lists: mean of normalized ranks (rank 0 in both → 1.0).
-      const fused = (keywordMatch.score + normalizeRrfScore(vectorRank)) / 2;
-      results.push({
-        score: fused,
-        result: {
-          id: keywordMatch.id,
-          subject: keywordMatch.subject,
-          predicate: keywordMatch.predicate,
-          graph: keywordMatch.graph,
-          text: keywordMatch.text,
-          score: fused,
-          scoreType: "rrf",
-        },
-      });
-      keywordById.delete(hit.id);
-    } else {
-      results.push({
-        score: clampCosine(hit.score),
-        result: hitToSearchResult(hit),
-      });
-    }
-  }
-
-  for (const keywordOnly of keywordById.values()) {
-    results.push({ score: keywordOnly.score, result: keywordOnly });
-  }
-
-  // Stable descending order by emitted score.
-  results.sort((a, b) => b.score - a.score);
-  return { mode: "hybrid", results };
-}
-
-function hitToSearchResult(hit: VectorSearchHit): SearchResult {
-  return {
-    id: hit.id,
-    subject: hit.metadata?.subject ?? "",
-    predicate: hit.metadata?.predicate ?? "",
-    graph: hit.metadata?.graph ?? "",
-    text: hit.metadata?.value ?? "",
-    score: clampCosine(hit.score),
-    scoreType: "cosine",
-  };
-}
-
-/** Vectorize returns cosine similarity in [-1, 1]; clamp to the contract [0, 1]. */
-function clampCosine(score: number): number {
-  return Math.max(0, Math.min(1, score));
 }
