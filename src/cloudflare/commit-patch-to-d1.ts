@@ -1,22 +1,18 @@
 import type * as rdfjs from "@rdfjs/types";
 import type { Patch, TransactionContext } from "@worlds/sdk/quad-store";
-import { isReplaceImportCommit } from "@worlds/sdk/quad-store";
-import { filterQuads, hashQuads } from "@worlds/sdk/quad-store";
-import type { D1ClientBaseOptions } from "@/cloudflare/d1-client-base-options.ts";
-import type { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
+import {
+  filterQuads,
+  hashQuads,
+  isReplaceImportCommit,
+} from "@worlds/sdk/quad-store";
 import {
   D1BatchExecutor,
   DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
 } from "@/cloudflare/d1/d1-batch-executor.ts";
 import {
-  buildBulkInsertQuads,
   buildDeleteDerivedQuadsByQuadIds,
   buildDeleteQuadsByQuadIds,
-  buildSelectExistingQuadIds,
-  buildWipeAllGraphDataStatements,
-  type InsertQuadRow,
 } from "@/cloudflare/quad-store/d1-quad-query-builder.ts";
-import { quadToInsertRow } from "@/cloudflare/d1/d1-quad-row.ts";
 import {
   DEFAULT_MAX_ASSERTED_QUADS,
   loadAssertedQuads,
@@ -25,45 +21,22 @@ import {
   type InferencePlan,
   planInference,
 } from "@/cloudflare/inference/inference-planner.ts";
+import type {
+  CommitPatchToD1Options,
+  CommitPatchToD1Result,
+} from "./commit-patch-to-d1-types.ts";
+import {
+  executeReplaceImportWipe,
+  queryCachePresence,
+  stageChunked,
+  stageDerivedRows,
+  stageNovelInsertions,
+} from "./commit-patch-to-d1-helpers.ts";
 
-export interface CommitPatchToD1Options extends D1ClientBaseOptions {
-  /** connection is the D1ConnectionDriver wrapping the D1 binding. */
-  connection: D1ConnectionDriver;
-
-  /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 100 (D1's batch cap). */
-  maxWriteBatchSize?: number;
-
-  /** worldId scopes this commit to one logical world. */
-  worldId?: string;
-}
-
-export interface CommitPatchToD1Result {
-  novelInsertions: rdfjs.Quad[];
-  novelQuadIds: string[];
-
-  /**
-   * inference summarizes the inferred rows this commit wrote. Absent when the
-   * world has not opted in.
-   */
-  inference?: {
-    derivedInserted: number;
-    derivedRemoved: number;
-    inconsistencies: InferencePlan["inconsistencies"];
-  };
-}
-
-/**
- * executeReplaceImportWipe clears all quads and search chunks before a replace-mode import commit.
- */
-async function executeReplaceImportWipe(
-  connection: D1ConnectionDriver,
-  writeBatchSize: number,
-  worldId?: string,
-): Promise<void> {
-  const executor = new D1BatchExecutor({ connection, writeBatchSize });
-  await executor.stage(buildWipeAllGraphDataStatements(worldId));
-  await executor.flush();
-}
+export type {
+  CommitPatchToD1Options,
+  CommitPatchToD1Result,
+} from "./commit-patch-to-d1-types.ts";
 
 /**
  * commitPatchToD1 commits additions and removals exclusively for D1 quads.
@@ -166,45 +139,21 @@ export async function commitPatchToD1(
       }
     }
 
-    if (novelQuadIds.length > 0) {
-      await stageChunked(
+    await stageNovelInsertions(
+      {
         batchExecutor,
-        novelQuadIds,
         lookupChunkSize,
-        (chunk) => [buildDeleteQuadsByQuadIds(chunk, worldId)],
-      );
-
-      const novelRows: InsertQuadRow[] = [];
-      for (let index = 0; index < novelInsertions.length; index++) {
-        novelRows.push(await quadToInsertRow(novelInsertions[index]!));
-      }
-      await batchExecutor.stage(
-        buildBulkInsertQuads(
-          novelRows.map((row) => ({
-            ...row,
-            world_id: worldId,
-            ...(inference && { derived: 0 as const }),
-          })),
-        ),
-      );
-    }
+        worldId,
+        inferenceEnabled: inference !== undefined,
+      },
+      novelInsertions,
+      novelQuadIds,
+    );
   }
 
   let derivedInserted = 0;
   if (plan) {
-    // OR IGNORE: a quad that is asserted (now or already) stays asserted.
-    const derivedRows: InsertQuadRow[] = [];
-    const seen = new Set<string>();
-    for (const quad of [...plan.derivedToAdd, ...plan.entailedDeletions]) {
-      const row = await quadToInsertRow(quad);
-      if (seen.has(row.quad_id)) continue;
-      seen.add(row.quad_id);
-      derivedRows.push({ ...row, world_id: worldId, derived: 1 });
-    }
-    derivedInserted = derivedRows.length;
-    await batchExecutor.stage(
-      buildBulkInsertQuads(derivedRows, { orIgnore: true }),
-    );
+    derivedInserted = await stageDerivedRows(batchExecutor, worldId, plan);
   }
 
   try {
@@ -225,38 +174,4 @@ export async function commitPatchToD1(
       },
     }),
   };
-}
-
-async function stageChunked(
-  executor: D1BatchExecutor,
-  ids: string[],
-  chunkSize: number,
-  build: (chunk: string[]) => Array<{ sql: string; args: unknown[] }>,
-): Promise<void> {
-  for (let index = 0; index < ids.length; index += chunkSize) {
-    const chunk = ids.slice(index, index + chunkSize);
-    await executor.stage(build(chunk));
-  }
-}
-
-async function queryCachePresence(
-  connection: D1ConnectionDriver,
-  quadIds: string[],
-  lookupChunkSize: number,
-  worldId?: string,
-  assertedOnly = false,
-): Promise<Set<string>> {
-  const cachedIds = new Set<string>();
-  for (let index = 0; index < quadIds.length; index += lookupChunkSize) {
-    const chunk = quadIds.slice(index, index + lookupChunkSize);
-    const result = await connection.execute(
-      buildSelectExistingQuadIds(chunk, worldId, { assertedOnly }),
-    );
-    for (const row of result.rows) {
-      if (row.id) {
-        cachedIds.add(String(row.id));
-      }
-    }
-  }
-  return cachedIds;
 }
