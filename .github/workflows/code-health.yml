@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: File length (warn-only; 120 src / 300 test, blank/comment/import lines excluded)
+      - name: File length (enforced; 120 src / 300 test, blank/comment/import lines excluded)
         run: |
           # Counts code lines: skips blank/comment lines and (multi-line) import / export-from statements.
           cat > "$RUNNER_TEMP/loc.awk" <<'AWK'
@@ -23,13 +23,24 @@ jobs:
           { n++ }
           END { print n + 0 }
           AWK
+          # Allowlist of files that may exceed the limit. It may only shrink.
+          #   d1-quad-stream.ts: EventEmitter-surface shim; the typed overloads and
+          #     listener bookkeeping are one cohesive unit (203 lines).
+          #   d1-rdfjs-store.ts: the RDF/JS Store facade; its mandated four-argument
+          #     method signatures dominate the count (164 lines).
+          allow='^src/cloudflare/rdfjs-store/(d1-quad-stream|d1-rdfjs-store)\.ts$'
           git ls-files '*.ts' '*.tsx' '*.js' '*.mjs' \
             | grep -vE '(^|/)(node_modules|dist|generated|fixtures|\.next)/|\.d\.ts$|\.gen\.|openapi|snapshot|schema' \
             | while read -r f; do
                 n=$(awk -f "$RUNNER_TEMP/loc.awk" "$f")
                 case "$f" in *.test.*|*.spec.*|*/tests/*|tests/*) max=300;; *) max=120;; esac
-                if [ "$n" -gt "$max" ]; then echo "::warning file=$f::$n lines of code (limit $max)"; echo "- \`$f\`: $n (limit $max)" >> "$GITHUB_STEP_SUMMARY"; fi
+                if [ "$n" -gt "$max" ]; then
+                  if echo "$f" | grep -qE "$allow"; then echo "allowlisted: $f ($n lines, limit $max)"; continue; fi
+                  echo "::error file=$f::$n lines of code (limit $max)"; echo "- \`$f\`: $n (limit $max)" >> "$GITHUB_STEP_SUMMARY"
+                  echo 1 >> "$RUNNER_TEMP/loc-fail"
+                fi
               done
+          if [ -s "$RUNNER_TEMP/loc-fail" ]; then exit 1; fi
       - name: TODO/FIXME without an issue link (warn-only)
         run: |
           git grep -nE '\b(TODO|FIXME)\b' -- '*.ts' '*.tsx' '*.js' '*.mjs' ':!*generated*' \
