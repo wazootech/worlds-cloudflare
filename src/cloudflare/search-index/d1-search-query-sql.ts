@@ -4,6 +4,7 @@ import {
   buildKeywordFtsStatement,
   sanitizeFtsQuery,
 } from "@worlds/sqlite/sql-core";
+import { buildWorldScopedKeywordStatement } from "./d1-world-scoped-fts.ts";
 import type { ColumnMapping, SqlStatement } from "@worlds/sqlite/sql-core";
 
 /** CHUNKS_TABLE_COLUMNS maps QuadFilter fields to chunks table column names. */
@@ -37,6 +38,17 @@ export function buildD1KeywordSearchStatement(
   // A present query with zero searchable tokens (pure punctuation, emoji)
   // must not emit `MATCH ""` — FTS5 crashes on the empty match string.
   const hasKeyword = sanitizedQuery.length > 0;
+
+  if (hasKeyword && worldId) {
+    // chunks_fts has no world column, so the shared keyword plan would rank and
+    // truncate across every tenant before the world filter. Scope first.
+    return buildWorldScopedKeywordStatement({
+      sanitizedQuery,
+      limit,
+      whereClauses,
+      filterArgs,
+    });
+  }
 
   if (hasKeyword) {
     const statement = buildKeywordFtsStatement({
