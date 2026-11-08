@@ -1,5 +1,4 @@
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import type * as rdfjs from "@rdfjs/types";
 import { WorldsSdk } from "@worlds/sdk";
 import type { WorldsSdkInterface } from "@worlds/sdk";
 import { WazooSparqlEngine } from "@wazoo/sparql-engine";
@@ -121,7 +120,7 @@ export async function createCloudflareWorldsSdk(
   });
 
   const sparqlEngine = new WazooSparqlEngine({
-    store: d1RdfjsStore as unknown as rdfjs.Store,
+    store: d1RdfjsStore,
     createTransaction: () => quadStore.createTransaction(),
   });
 
