@@ -8,6 +8,7 @@ import {
 import {
   D1BatchExecutor,
   DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
+  effectiveLookupChunkSize,
 } from "@/cloudflare/d1/d1-batch-executor.ts";
 import {
   buildDeleteDerivedQuadsByQuadIds,
@@ -57,9 +58,9 @@ export async function commitPatchToD1(
   } = options;
   // The documented cap is host parameters per statement; world-scoped
   // statements also bind world_id, so reserve one slot for it.
-  const lookupChunkSize = Math.max(
-    1,
-    (maxLookupChunkSize ?? 100) - (worldId ? 1 : 0),
+  const lookupChunkSize = effectiveLookupChunkSize(
+    maxLookupChunkSize,
+    Boolean(worldId),
   );
   const writeBatchSize = maxWriteBatchSize ?? DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
 
