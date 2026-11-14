@@ -1,4 +1,5 @@
 import { buildChunksQuadIdIndex } from "@worlds/sqlite/sql-core";
+import { validateWorldId } from "@/cloudflare/validate-world-id.ts";
 
 /** Maximum embedding dimensions accepted by D1SchemaBuilder (Vectorize cap: 1536 float32). */
 const D1_MAX_VECTOR_DIMENSIONS = 1536;
@@ -24,6 +25,7 @@ export class D1SchemaBuilder {
     vectorDimensions: number,
     options?: D1SchemaBuilderOptions,
   ) {
+    validateWorldId(options?.worldId, "D1SchemaBuilder");
     const dimensions = Math.floor(Number(vectorDimensions));
     if (
       !Number.isFinite(dimensions) ||

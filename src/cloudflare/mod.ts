@@ -25,6 +25,7 @@ export * from "./search-index/mod.ts";
 export type { InferenceOptions } from "./d1-client-base-options.ts";
 export { InferenceSizeGuardError } from "./inference/load-asserted-quads.ts";
 export { backfillInference } from "./inference/backfill-inference.ts";
+export { validateWorldId } from "./validate-world-id.ts";
 export type {
   BackfillInferenceOptions,
   BackfillInferenceReport,
