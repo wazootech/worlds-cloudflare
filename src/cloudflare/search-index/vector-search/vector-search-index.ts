@@ -64,6 +64,16 @@ export interface VectorizeIndexLike {
     }>,
   ): Promise<unknown>;
   deleteByIds(ids: string[]): Promise<unknown>;
+
+  /**
+   * deleteByMetadataFilter deletes every vector whose metadata matches the
+   * filter. Requires a metadata index on the filtered property (provisioning
+   * already mandates one on `world_id`). Optional so older bindings and test
+   * doubles stay structurally assignable.
+   */
+  deleteByMetadataFilter?(
+    filter: { filter: Record<string, string> },
+  ): Promise<unknown>;
 }
 
 /**
@@ -96,4 +106,13 @@ export interface VectorSearchIndex {
 
   /** deleteByIds removes entries by id (best-effort for unknown ids). */
   deleteByIds(ids: string[]): Promise<void>;
+
+  /**
+   * deleteAll removes every vector this index instance owns (worlds-cloudflare#71 item 3).
+   * The Vectorize implementation is world-scoped, so this purges one world;
+   * it backs replace-import wipes and the reindex reconcile pass. Throws when
+   * the underlying binding cannot delete by metadata filter — callers count
+   * the failure as drift rather than failing the write.
+   */
+  deleteAll(): Promise<void>;
 }

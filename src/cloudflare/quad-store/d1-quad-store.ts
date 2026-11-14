@@ -11,6 +11,7 @@ import {
   Transaction,
 } from "@worlds/sdk/quad-store";
 import { commitPatchToD1 } from "@/cloudflare/commit-patch-to-d1.ts";
+import { isReplaceImportCommit } from "@worlds/sdk/quad-store";
 import type { D1ClientBaseOptions } from "@/cloudflare/d1-client-base-options.ts";
 import type { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
 import type { D1RdfjsStore } from "@/cloudflare/rdfjs-store/mod.ts";
@@ -96,6 +97,33 @@ export class D1QuadStore implements QuadStoreInterface {
           { ...this.options, worldId: this.options.worldId },
           context,
         );
+
+        // A replace-import wipe deletes quads and chunk rows, but the vector
+        // ids of the removed content are unrecoverable afterwards, so its
+        // vectors would stay searchable (worlds-cloudflare#71 item 3). Purge
+        // them here unless a reindex follows: the deferred reindex purges and
+        // re-upserts itself. Purge failures are logged drift, never thrown.
+        if (
+          isReplaceImportCommit(context) && !skipSearchIndexProjection &&
+          this.options.searchIndexProjector &&
+          !(isImport && searchIndexOnImport === "deferred")
+        ) {
+          try {
+            const purge = await this.options.searchIndexProjector
+              .purgeVectors();
+            if (purge.staleDeleteFailures > 0) {
+              console.error(
+                "[vector-sync] replace-import vector purge failed; run reindex to repair",
+                JSON.stringify({ errors: purge.errors }),
+              );
+            }
+          } catch (error) {
+            console.error(
+              "[vector-sync] replace-import vector purge threw unexpectedly",
+              error,
+            );
+          }
+        }
 
         if (!skipSearchIndexProjection && this.options.searchIndexProjector) {
           try {
