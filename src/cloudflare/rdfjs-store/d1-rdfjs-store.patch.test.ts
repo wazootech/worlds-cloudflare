@@ -2,11 +2,13 @@ import { assertEquals } from "@std/assert";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import type * as rdfjs from "@rdfjs/types";
 import { collectQuadsFromStream } from "@worlds/sdk/quad-store";
+import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 import {
   createTestD1Store,
   literal,
   namedNode,
 } from "./d1-rdfjs-store-test-helpers.ts";
+import { D1RdfjsStore } from "./mod.ts";
 
 Deno.test("D1RdfjsStore.applyPatch - merge inserts and deletes in one batch", async () => {
   const { store, dispose } = await createTestD1Store();
@@ -29,6 +31,33 @@ Deno.test("D1RdfjsStore.applyPatch - merge inserts and deletes in one batch", as
     assertEquals(await store.countQuads(), 1);
   } finally {
     await dispose();
+  }
+});
+
+Deno.test("D1RdfjsStore.applyPatch - world-scoped deletion of 100+ quads stays under the D1 param cap", async () => {
+  // Regression for the world_id slot reservation: a world-scoped deletion
+  // IN-list chunked at the default 100 plus the bound world_id exceeded D1's
+  // 100 host parameters per statement.
+  const substrate = await createTestD1();
+  const store = new D1RdfjsStore({
+    connection: substrate.connection,
+    worldId: "w1",
+  });
+  try {
+    await store.ensureSchema();
+    const quads = Array.from({ length: 120 }, (_, index) =>
+      DataFactory.quad(
+        namedNode(`urn:s${index}`),
+        namedNode("urn:p"),
+        literal(`o${index}`),
+      ));
+    await store.applyPatch({ insertions: quads, deletions: [] });
+    assertEquals(await store.countQuads(), 120);
+
+    await store.applyPatch({ insertions: [], deletions: quads });
+    assertEquals(await store.countQuads(), 0);
+  } finally {
+    await substrate.dispose();
   }
 });
 

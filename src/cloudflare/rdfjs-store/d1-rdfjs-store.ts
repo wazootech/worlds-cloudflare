@@ -3,8 +3,10 @@ import { DataFactory } from "@wazoo/sparql-engine";
 import type { Patch, TransactionContext } from "@worlds/sdk/quad-store";
 import type { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
 import { DEFAULT_D1_MATCH_PAGE_SIZE } from "@/cloudflare/quad-store/d1-quad-query-builder.ts";
-import { DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE } from "@/cloudflare/d1/d1-batch-executor.ts";
-import { DEFAULT_D1_MAX_WRITE_BATCH_SIZE } from "@/cloudflare/d1/d1-batch-executor.ts";
+import {
+  DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
+  effectiveLookupChunkSize,
+} from "@/cloudflare/d1/d1-batch-executor.ts";
 import { D1SchemaBuilder } from "@/cloudflare/schema/d1-schema-builder.ts";
 import { D1QuadStream } from "./d1-quad-stream.ts";
 import { D1TransactionImpl } from "./d1-rdfjs-transaction.ts";
@@ -92,11 +94,13 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     this.matchPageSize = options.matchPageSize ?? DEFAULT_D1_MATCH_PAGE_SIZE;
     this.writeBatchSize = options.maxWriteBatchSize ??
       DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
-    this.lookupChunkSize = options.maxLookupChunkSize ??
-      DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE;
+    this.worldId = options.worldId;
+    this.lookupChunkSize = effectiveLookupChunkSize(
+      options.maxLookupChunkSize,
+      Boolean(this.worldId),
+    );
     this.schemaBuilder = options.schemaBuilder ??
       new D1SchemaBuilder(32, { worldId: options.worldId });
-    this.worldId = options.worldId;
     this.requireDerivedColumn = options.requireDerivedColumn ?? false;
     this.writes = new D1WriteQueue(this.connection, this.worldId);
   }

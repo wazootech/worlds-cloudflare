@@ -21,6 +21,7 @@ import type {
 import {
   D1BatchExecutor,
   DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
+  effectiveLookupChunkSize,
 } from "@/cloudflare/d1/d1-batch-executor.ts";
 
 /**
@@ -126,7 +127,10 @@ async function stageChunkedDeletions(
   quadIds: string[],
   options: D1QuadStoreOptions,
 ): Promise<void> {
-  const lookupChunkSize = options.maxLookupChunkSize ?? 100;
+  const lookupChunkSize = effectiveLookupChunkSize(
+    options.maxLookupChunkSize,
+    Boolean(options.worldId),
+  );
   const batchExecutor = new D1BatchExecutor({
     connection: options.connection,
     writeBatchSize: options.maxWriteBatchSize ??
