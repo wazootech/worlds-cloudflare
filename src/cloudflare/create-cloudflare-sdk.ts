@@ -15,6 +15,7 @@ import { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
 import { D1RdfjsStore } from "@/cloudflare/rdfjs-store/mod.ts";
 import { D1SchemaBuilder } from "@/cloudflare/schema/d1-schema-builder.ts";
 import { D1SearchQueryBuilder } from "@/cloudflare/search-index/d1-search-query-builder.ts";
+import { validateWorldId } from "@/cloudflare/validate-world-id.ts";
 
 /**
  * CloudflareWorldsSdkOptions configures Cloudflare D1 execution through D1RdfjsStore and quad indexes.
@@ -57,6 +58,7 @@ export interface CloudflareWorldsSdkOptions extends D1ClientBaseOptions {
 export async function createCloudflareWorldsSdk(
   options: CloudflareWorldsSdkOptions,
 ): Promise<WorldsSdkInterface> {
+  validateWorldId(options.worldId, "createCloudflareWorldsSdk");
   if (options.vectorize && !options.worldId) {
     throw new Error(
       "createCloudflareWorldsSdk: worldId is required when vectorize is set; the Vectorize index is shared across worlds (worlds-cloudflare#41)",

@@ -13,6 +13,7 @@ import {
   type InsertQuadRow,
 } from "@/cloudflare/quad-store/d1-quad-query-builder.ts";
 import { quadToInsertRow } from "@/cloudflare/d1/d1-quad-row.ts";
+import { validateWorldId } from "@/cloudflare/validate-world-id.ts";
 import {
   DEFAULT_MAX_ASSERTED_QUADS,
   loadAssertedQuads,
@@ -64,6 +65,7 @@ export async function backfillInference(
   options: BackfillInferenceOptions,
 ): Promise<BackfillInferenceReport> {
   const { worldId } = options;
+  validateWorldId(worldId, "backfillInference");
   const connection = new D1ConnectionDriver(options.database, { worldId });
   // Fails closed when the database has no quads.derived column.
   await new D1RdfjsStore({

@@ -167,6 +167,18 @@ export async function checkD1SchemaCompatibility(
     if (actual.has("id")) {
       issues.push({ table, detail: "legacy id column remains" });
     }
+    // A world-scoped database opened without a worldId would run unscoped SQL
+    // over the shared table: fail closed instead of crossing worlds.
+    if (
+      options.worldId === undefined && table === "quads" &&
+      actual.has("world_id")
+    ) {
+      issues.push({
+        table,
+        detail:
+          "world-scoped schema present but no worldId was provided; reopen with a worldId",
+      });
+    }
     for (const column of columns) {
       if (!actual.has(column)) {
         issues.push({ table, detail: `missing column ${column}` });
