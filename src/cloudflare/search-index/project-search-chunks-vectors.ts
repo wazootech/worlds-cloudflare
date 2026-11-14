@@ -33,6 +33,28 @@ export async function syncVectors(
 }
 
 /**
+ * purgeWorldVectors deletes every vector the configured index holds for this
+ * client's world (worlds-cloudflare#71 item 3). Used by replace-import wipes
+ * and by reindex so vectors for quads that no longer exist stop surfacing in
+ * semantic results — vector ids derive from chunk content, which is gone by
+ * the time a wipe has run, so ids-targeted deletion is impossible here.
+ * A failure leaves stale vectors behind; it is counted, not thrown.
+ */
+export async function purgeWorldVectors(
+  options: ProjectSearchChunksOptions,
+): Promise<VectorSyncReport> {
+  const report = emptyVectorSyncReport(vectorSyncEnabled(options));
+  if (!options.vectorSearch || !options.embeddingService) return report;
+  try {
+    await options.vectorSearch.deleteAll();
+  } catch (error) {
+    report.staleDeleteFailures += 1;
+    recordVectorSyncError(report, "purge-world", error);
+  }
+  return report;
+}
+
+/**
  * deleteStaleVectors removes vectors for chunk rows being refreshed, computed
  * deterministically from the chunk quad ids before the D1 rows are replaced.
  * A failure leaves stale vectors behind; it is counted, not thrown.

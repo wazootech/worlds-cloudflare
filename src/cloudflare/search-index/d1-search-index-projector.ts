@@ -1,6 +1,7 @@
 import type * as rdfjs from "@rdfjs/types";
 import type { ProjectSearchChunksOptions } from "./project-search-chunks.ts";
 import { projectSearchChunks } from "./project-search-chunks.ts";
+import { purgeWorldVectors } from "./project-search-chunks-vectors.ts";
 import { rebuildD1SearchIndexFromQuads } from "./rebuild-d1-search-index-from-quads.ts";
 import type { VectorSyncReport } from "./vector-sync-report.ts";
 
@@ -43,5 +44,15 @@ export class D1SearchIndexProjector {
     await rebuildD1SearchIndexFromQuads({
       ...this.options,
     });
+  }
+
+  /**
+   * purgeVectors deletes every vector this world holds in the outside-D1
+   * vector index (worlds-cloudflare#71 item 3). The commit hook calls it
+   * after a replace-import wipe when chunk projection runs incrementally; in
+   * deferred mode the reindex that follows reconciles vectors itself.
+   */
+  public async purgeVectors(): Promise<VectorSyncReport> {
+    return await purgeWorldVectors(this.options);
   }
 }

@@ -1,5 +1,6 @@
 import type * as rdfjs from "@rdfjs/types";
 import { filterQuads } from "@worlds/sdk/quad-store";
+import type { QuadCriteria } from "@worlds/sdk/quad-store";
 import { quadFromD1Row } from "@/cloudflare/d1/d1-quad-row.ts";
 import {
   buildMatchQuadsQuery,
@@ -10,6 +11,7 @@ import {
   type ProjectSearchChunksOptions,
   refreshSearchChunksForQuads,
 } from "./project-search-chunks.ts";
+import { purgeWorldVectors } from "./project-search-chunks-vectors.ts";
 import {
   emptyVectorSyncReport,
   logVectorSyncDrift,
@@ -38,6 +40,13 @@ export interface ReadProjectSearchChunksOptions
  * rebuildD1SearchIndexFromQuads rebuilds FTS chunk rows from the `quads` table without re-importing graph data.
  *
  * Use after schema upgrades, label predicate changes, or discovery-index tuning so existing corpora pick up refreshed `fts_value`.
+ *
+ * When vector sync is on and no include/exclude filter narrows the rebuild,
+ * the world's vectors are purged first (worlds-cloudflare#71 item 3): quads
+ * removed since the last projection have no surviving D1 row to derive a
+ * vector id from, so a rebuild that only upserts would leave their vectors
+ * searchable forever. Deleting first and re-upserting makes reindex a true
+ * reconcile; a purge failure is counted as drift, not thrown.
  */
 export async function rebuildD1SearchIndexFromQuads(
   options: ReadProjectSearchChunksOptions,
@@ -54,12 +63,26 @@ export async function rebuildD1SearchIndexFromQuads(
     Math.floor(readPageSize ?? DEFAULT_D1_MATCH_PAGE_SIZE),
   );
   const matcher = filterQuads({ include, exclude });
+  // A filtered rebuild only touches a subset, so a wholesale vector purge
+  // would delete vectors the rebuild never re-upserts.
+  const hasCriteria = (criteria?: QuadCriteria) =>
+    Boolean(
+      criteria?.subjects?.length || criteria?.predicates?.length ||
+        criteria?.graphs?.length,
+    );
+  const fullRebuild = !hasCriteria(include) && !hasCriteria(exclude);
 
   let processedQuadCount = 0;
   let chunkRowCount = 0;
   let vectorSync = emptyVectorSyncReport(
     Boolean(options.embeddingService && options.vectorSearch),
   );
+  if (fullRebuild) {
+    vectorSync = mergeVectorSyncReports(
+      vectorSync,
+      await purgeWorldVectors(options),
+    );
+  }
   let afterQuadId: string | undefined;
 
   for (;;) {
