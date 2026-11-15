@@ -8,6 +8,8 @@ import { countD1Quads } from "./d1-rdfjs-store-lifecycle.ts";
 export class D1WriteQueue {
   /** serialized write queue: every mutation runs after the previous one. */
   private mutationQueue: Promise<void> = Promise.resolve();
+  /** lastWrite rejects if the most recent write failed; flush surfaces it. */
+  private lastWrite: Promise<void> = Promise.resolve();
   /** synchronous size approximation, refreshed after every write. */
   public liveCount = 0;
 
@@ -20,9 +22,12 @@ export class D1WriteQueue {
     this.liveCount = await countD1Quads(this.connection, this.worldId);
   }
 
-  /** flush resolves once every queued write has committed. */
+  /**
+   * flush resolves once every queued write has committed, and rejects if any
+   * of them failed (the queue itself keeps draining later writes).
+   */
   public flush(): Promise<void> {
-    return this.mutationQueue;
+    return this.lastWrite;
   }
 
   /**
@@ -38,6 +43,7 @@ export class D1WriteQueue {
       () => {},
       () => {},
     );
+    this.lastWrite = next;
     return next;
   }
 }
