@@ -106,3 +106,64 @@ Deno.test("D1BatchExecutor - repeated stage and flush accumulates batches indepe
 
   assertEquals(database.batchCalls, [100, 50, 1]);
 });
+
+Deno.test("D1BatchExecutor - mid-stream batch failure reports progress and fails closed", async () => {
+  const calls: number[] = [];
+  const failingDatabase: D1DatabaseLike = {
+    prepare: () => new RecordingStatement(),
+    batch: (statements) => {
+      calls.push(statements.length);
+      if (calls.length === 2) {
+        return Promise.reject(new Error("d1 unavailable"));
+      }
+      return Promise.resolve([]);
+    },
+    exec: () => Promise.resolve(),
+  };
+  const connection = new D1ConnectionDriver(failingDatabase);
+  const executor = new D1BatchExecutor({ connection, writeBatchSize: 100 });
+
+  await executor.stage(
+    Array.from(
+      { length: 250 },
+      (_, index) => createStatement("INSERT INTO t VALUES (?)", [index]),
+    ),
+  );
+  let flushError: Error | undefined;
+  try {
+    await executor.flush();
+  } catch (error) {
+    flushError = error as Error;
+  }
+
+  assertEquals(calls, [100, 100]);
+  assertEquals(
+    flushError?.message.includes("after 100 of 250 staged statements"),
+    true,
+  );
+  assertEquals(flushError?.message.includes("150 not executed"), true);
+
+  // Fail-closed: further use is refused instead of silently skipping the tail.
+  let refusedError: Error | undefined;
+  try {
+    await executor.flush();
+  } catch (error) {
+    refusedError = error as Error;
+  }
+  assertEquals(refusedError?.message.includes("fail-closed"), true);
+  assertEquals(calls.length, 2, "no batches after failure");
+
+  const stageResult = await (async () => {
+    try {
+      await executor.stage([
+        createStatement("INSERT INTO t VALUES (?)", [1]),
+      ]);
+      return "staged";
+    } catch (error) {
+      return (error as Error).message.includes("fail-closed")
+        ? "refused"
+        : "other";
+    }
+  })();
+  assertEquals(stageResult, "refused");
+});

@@ -80,6 +80,8 @@ export async function applyD1Patch(
   try {
     await executor.flush();
   } catch (cause) {
+    // D1BatchExecutor already reports sent/unsent counts and fails closed;
+    // re-wrap with the applyD1Patch context only.
     const detail = cause instanceof Error ? cause.message : String(cause);
     throw new Error(`failed to execute D1 batch: ${detail}`, { cause });
   }
