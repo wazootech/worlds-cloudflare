@@ -8,8 +8,8 @@ import { countD1Quads } from "./d1-rdfjs-store-lifecycle.ts";
 export class D1WriteQueue {
   /** serialized write queue: every mutation runs after the previous one. */
   private mutationQueue: Promise<void> = Promise.resolve();
-  /** lastWrite rejects if the most recent write failed; flush surfaces it. */
-  private lastWrite: Promise<void> = Promise.resolve();
+  /** Write failures recorded since the last flush() report. */
+  private pendingFailures: unknown[] = [];
   /** synchronous size approximation, refreshed after every write. */
   public liveCount = 0;
 
@@ -23,11 +23,32 @@ export class D1WriteQueue {
   }
 
   /**
-   * flush resolves once every queued write has committed, and rejects if any
-   * of them failed (the queue itself keeps draining later writes).
+   * flush resolves once every queued write has committed, and rejects with an
+   * AggregateError listing every failure since the previous flush (capped at
+   * the first 10 plus a count of the rest, so a long outage does not produce
+   * hundreds of copies of the same error). The queue itself keeps draining
+   * later writes.
    */
   public flush(): Promise<void> {
-    return this.lastWrite;
+    return this.mutationQueue.then(() => {
+      const failures = this.pendingFailures;
+      this.pendingFailures = [];
+      if (failures.length === 0) return;
+      const capped = failures.slice(0, MAX_REPORTED_FAILURES);
+      const suppressed = failures.length - capped.length;
+      const errors = suppressed > 0
+        ? [
+          ...capped,
+          new Error(
+            `${suppressed} more write failure(s) suppressed; see the logged errors`,
+          ),
+        ]
+        : capped;
+      throw new AggregateError(
+        errors,
+        `${failures.length} queued write(s) failed`,
+      );
+    });
   }
 
   /**
@@ -36,14 +57,21 @@ export class D1WriteQueue {
    */
   public enqueueWrite(work: () => Promise<void>): Promise<void> {
     const next = this.mutationQueue.then(async () => {
-      await work();
-      await this.refreshCount();
+      try {
+        await work();
+        await this.refreshCount();
+      } catch (error) {
+        this.pendingFailures.push(error);
+        throw error;
+      }
     });
     this.mutationQueue = next.then(
       () => {},
       () => {},
     );
-    this.lastWrite = next;
     return next;
   }
 }
+
+/** flush() reports at most this many of the failures it aggregates. */
+const MAX_REPORTED_FAILURES = 10;

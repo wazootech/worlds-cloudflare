@@ -30,7 +30,7 @@ export type { D1Transaction } from "./d1-rdfjs-transaction.ts";
 /**
  * logWriteFailure reports a fire-and-forget write failure (addQuad/removeQuad
  * return synchronously, so their rejections would otherwise vanish); the write
- * queue keeps draining, and flush() rejects with the same error.
+ * queue keeps draining, and the next flush() rejects with an AggregateError listing every failure since the previous flush.
  */
 const logWriteFailure = (
   operation: string,
@@ -40,7 +40,7 @@ const logWriteFailure = (
   console.error(
     `[d1-rdfjs-store] ${operation} write failed for world "${
       worldId ?? "<unscoped>"
-    }"; awaiting flush() rejects with this error`,
+    }"; awaiting flush() rejects with an AggregateError including it`,
     error,
   );
 };
