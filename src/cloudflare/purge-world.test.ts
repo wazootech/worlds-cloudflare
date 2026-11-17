@@ -72,22 +72,24 @@ async function createContext(): Promise<Context> {
   };
 }
 
-const quadText = (subject: string, text: string) =>
-  createQuad(namedNode(subject), namedNode("urn:knows"), literal(text));
+function quadText(subject: string, text: string) {
+  return createQuad(namedNode(subject), namedNode("urn:knows"), literal(text));
+}
 
-const vectorIdFor = (subject: string, text: string) =>
-  buildSearchResultId({
+function vectorIdFor(subject: string, text: string) {
+  return buildSearchResultId({
     subject,
     predicate: "urn:knows",
     graph: "",
     text,
   });
+}
 
-const count = async (
+async function count(
   connection: Context["connection"],
   table: string,
   worldId?: string,
-): Promise<number> => {
+): Promise<number> {
   const result = await connection.execute(
     worldId
       ? {
@@ -97,7 +99,7 @@ const count = async (
       : { sql: `SELECT COUNT(*) AS n FROM ${table}` },
   );
   return result.rows[0] ? Number((result.rows[0] as { n: number }).n) : 0;
-};
+}
 
 Deno.test(
   "purgeWorld removes quads, chunks and vectors for the world only (#71 item 6)",
