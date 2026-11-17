@@ -60,16 +60,18 @@ async function createContext(): Promise<Context> {
   };
 }
 
-const quadText = (subject: string, text: string) =>
-  createQuad(namedNode(subject), namedNode("urn:knows"), literal(text));
+function quadText(subject: string, text: string) {
+  return createQuad(namedNode(subject), namedNode("urn:knows"), literal(text));
+}
 
-const vectorIdFor = (subject: string, text: string) =>
-  buildSearchResultId({
+function vectorIdFor(subject: string, text: string) {
+  return buildSearchResultId({
     subject,
     predicate: "urn:knows",
     graph: "",
     text,
   });
+}
 
 Deno.test(
   "replace import with incremental projection purges stale vectors (#71 item 3)",
