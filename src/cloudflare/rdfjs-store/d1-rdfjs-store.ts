@@ -32,18 +32,18 @@ export type { D1Transaction } from "./d1-rdfjs-transaction.ts";
  * return synchronously, so their rejections would otherwise vanish); the write
  * queue keeps draining, and the next flush() rejects with an AggregateError listing every failure since the previous flush.
  */
-const logWriteFailure = (
+function logWriteFailure(
   operation: string,
   worldId: string | undefined,
   error: unknown,
-): void => {
+): void {
   console.error(
     `[d1-rdfjs-store] ${operation} write failed for world "${
       worldId ?? "<unscoped>"
     }"; awaiting flush() rejects with an AggregateError including it`,
     error,
   );
-};
+}
 
 /**
  * D1RdfjsStoreOptions configures D1RdfjsStore.
