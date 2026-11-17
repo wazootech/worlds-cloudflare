@@ -29,6 +29,24 @@ import {
 export type { D1Transaction } from "./d1-rdfjs-transaction.ts";
 
 /**
+ * logWriteFailure reports a fire-and-forget write failure (addQuad/removeQuad
+ * return synchronously, so their rejections would otherwise vanish); the write
+ * queue keeps draining, and the next flush() rejects with an AggregateError listing every failure since the previous flush.
+ */
+function logWriteFailure(
+  operation: string,
+  worldId: string | undefined,
+  error: unknown,
+): void {
+  console.error(
+    `[d1-rdfjs-store] ${operation} write failed for world "${
+      worldId ?? "<unscoped>"
+    }"; awaiting flush() rejects with an AggregateError including it`,
+    error,
+  );
+}
+
+/**
  * D1RdfjsStoreOptions configures D1RdfjsStore.
  */
 export interface D1RdfjsStoreOptions {
@@ -180,15 +198,19 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
         graph as rdfjs.Quad_Graph,
       )
       : quadOrSubject as rdfjs.Quad;
-    void this.writes.enqueueWrite(() =>
+    this.writes.enqueueWrite(() =>
       insertD1Quad(this.connection, this.worldId, quad)
+    ).catch((error: unknown) =>
+      logWriteFailure("addQuad", this.worldId, error)
     );
     return this;
   }
 
   public removeQuad(quad: rdfjs.Quad): this {
-    void this.writes.enqueueWrite(() =>
+    this.writes.enqueueWrite(() =>
       deleteD1Quad(this.connection, this.worldId, quad)
+    ).catch((error: unknown) =>
+      logWriteFailure("removeQuad", this.worldId, error)
     );
     return this;
   }
