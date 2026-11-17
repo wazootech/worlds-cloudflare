@@ -13,6 +13,8 @@ import type {
 export class FakeVectorSearchIndex implements VectorSearchIndex {
   private readonly entries = new Map<string, VectorSearchEntry>();
 
+  public constructor(private readonly worldId?: string) {}
+
   public get size(): number {
     return this.entries.size;
   }
@@ -55,6 +57,25 @@ export class FakeVectorSearchIndex implements VectorSearchIndex {
   public deleteByIds(ids: string[]): Promise<void> {
     for (const id of ids) {
       this.entries.delete(id);
+    }
+    return Promise.resolve();
+  }
+
+  /**
+   * deleteAll clears the vectors this instance owns. With a worldId (matching
+   * the world-scoped Vectorize implementation) only that world's entries go;
+   * without one the fake holds a single world by convention, so all entries
+   * go and upserts re-populate on the next projection.
+   */
+  public deleteAll(): Promise<void> {
+    if (this.worldId === undefined) {
+      this.entries.clear();
+    } else {
+      for (const [id, entry] of this.entries) {
+        if (entry.metadata["world_id"] === this.worldId) {
+          this.entries.delete(id);
+        }
+      }
     }
     return Promise.resolve();
   }

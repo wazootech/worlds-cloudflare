@@ -107,6 +107,24 @@ export class VectorizeVectorSearchIndex implements VectorSearchIndex {
     );
   }
 
+  public async deleteAll(): Promise<void> {
+    const deleter = this.options.index.deleteByMetadataFilter;
+    if (typeof deleter !== "function") {
+      throw new Error(
+        "deleteAll requires a Vectorize binding with deleteByMetadataFilter (and a metadata index on world_id); upgrade the binding and re-provision the metadata index",
+      );
+    }
+    // Vectorize processes deletes asynchronously; an upsert of the same id
+    // racing a pending delete is resolved by last-write-wins per id, so a
+    // deleteAll followed immediately by a reindex re-upsert is safe. The
+    // eventual window means removed content can still surface for a short
+    // period — the same window the stale-vector bug (worlds-cloudflare#71
+    // item 3) had, but now bounded by the reindex instead of unbounded.
+    await deleter.call(this.options.index, {
+      filter: { [WORLD_ID_KEY]: this.worldId },
+    });
+  }
+
   /**
    * physicalId namespaces a contract search-result id by world. Vectorize
    * caps ids at 64 bytes, so the pair is hashed (SHA-256, base64url: 45
