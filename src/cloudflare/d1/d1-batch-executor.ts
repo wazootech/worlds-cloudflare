@@ -44,12 +44,23 @@ export interface D1BatchExecutorOptions {
 export class D1BatchExecutor {
   private readonly statements: D1Statement[] = [];
 
+  /**
+   * failure is set once a batch() call fails mid-flush. The executor is then
+   * fail-closed: staged statements after the failed batch were never executed
+   * and a retry would silently skip them, so every later stage/flush rejects.
+   */
+  private failure: { sent: number; staged: number; cause: unknown } | null =
+    null;
+
   public constructor(private readonly options: D1BatchExecutorOptions) {}
 
   /**
    * stage appends statements and flushes eagerly when the staging buffer grows too large.
    */
   public async stage(source: readonly D1Statement[]): Promise<void> {
+    if (this.failure) {
+      throw this.failureError("stage");
+    }
     const sourceLength = source.length;
     for (let index = 0; index < sourceLength; index++) {
       this.statements.push(source[index]!);
@@ -63,8 +74,16 @@ export class D1BatchExecutor {
    * flush executes and clears all currently staged write statements.
    * D1's atomic unit is a single batch() call capped at 100 statements, so
    * staged statements are chunked by writeBatchSize and executed sequentially.
+   *
+   * A failure mid-stream leaves the commit partially applied (statements before
+   * the failed batch committed; the rest never ran). The executor records that
+   * state and refuses further use rather than letting a later flush silently
+   * skip the unexecuted tail.
    */
   public async flush(): Promise<void> {
+    if (this.failure) {
+      throw this.failureError("flush");
+    }
     if (this.statements.length === 0) {
       return;
     }
@@ -72,12 +91,37 @@ export class D1BatchExecutor {
     const { connection, writeBatchSize } = this.options;
     const staged = this.statements.splice(0, this.statements.length);
 
+    let sent = 0;
     try {
       for (let index = 0; index < staged.length; index += writeBatchSize) {
         await connection.batch(staged.slice(index, index + writeBatchSize));
+        sent += Math.min(writeBatchSize, staged.length - index);
       }
-    } finally {
-      this.statements.length = 0;
+    } catch (cause) {
+      this.failure = { sent, staged: staged.length, cause };
+      throw this.wrapFlushFailure(cause);
     }
+  }
+
+  private wrapFlushFailure(cause: unknown): Error {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    const { sent = 0, staged = 0 } = this.failure ?? {};
+    return new Error(
+      `D1 batch failed after ${sent} of ${staged} staged statements (${
+        staged - sent
+      } not executed): ${detail}`,
+      { cause },
+    );
+  }
+
+  private failureError(operation: string): Error {
+    const { sent = 0, staged = 0, cause } = this.failure!;
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    return new Error(
+      `D1 batch executor is fail-closed after a mid-stream batch failure (${sent} of ${staged} statements executed, ${
+        staged - sent
+      } not executed); ${operation} refused: ${detail}`,
+      { cause },
+    );
   }
 }

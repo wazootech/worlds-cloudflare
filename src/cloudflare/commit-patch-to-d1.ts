@@ -66,14 +66,29 @@ export async function commitPatchToD1(
 
   const batchExecutor = new D1BatchExecutor({ connection, writeBatchSize });
 
-  if (isReplaceImportCommit(context)) {
-    await executeReplaceImportWipe(connection, writeBatchSize, worldId);
-  }
-
   const matcher = filterQuads({ include, exclude });
 
   const targetedDeletions = patch.deletions?.filter(matcher) ?? [];
   const targetedInsertions = patch.insertions?.filter(matcher) ?? [];
+
+  // Pure, fallible prep runs BEFORE the replace-import wipe so a throw here
+  // (matcher on malformed input, hashing) cannot leave the world wiped with no
+  // replacement data committed. Only DB reads and the inference plan remain
+  // after the wipe, because both must observe post-wipe state.
+  const deletionQuadIds = new Set<string>();
+  if (targetedDeletions.length) {
+    const computedDeletionQuadIds = await hashQuads(targetedDeletions);
+    for (const quadId of computedDeletionQuadIds) {
+      deletionQuadIds.add(quadId);
+    }
+  }
+  const proposedInsertionQuadIds = targetedInsertions.length
+    ? await hashQuads(targetedInsertions)
+    : [];
+
+  if (isReplaceImportCommit(context)) {
+    await executeReplaceImportWipe(connection, writeBatchSize, worldId);
+  }
 
   // Inference runs before any write so a size-guard failure leaves the world
   // untouched. It reads the asserted quads as they are after any replace wipe.
@@ -94,20 +109,13 @@ export async function commitPatchToD1(
     });
   }
 
-  const deletionQuadIds = new Set<string>();
-  if (targetedDeletions.length) {
-    const computedDeletionQuadIds = await hashQuads(targetedDeletions);
-    for (const quadId of computedDeletionQuadIds) {
-      deletionQuadIds.add(quadId);
-    }
-    if (computedDeletionQuadIds.length > 0) {
-      await stageChunked(
-        batchExecutor,
-        computedDeletionQuadIds,
-        lookupChunkSize,
-        (chunk) => [buildDeleteQuadsByQuadIds(chunk, worldId)],
-      );
-    }
+  if (targetedDeletions.length && deletionQuadIds.size > 0) {
+    await stageChunked(
+      batchExecutor,
+      [...deletionQuadIds],
+      lookupChunkSize,
+      (chunk) => [buildDeleteQuadsByQuadIds(chunk, worldId)],
+    );
   }
 
   if (plan && plan.derivedToRemove.length > 0) {
@@ -123,7 +131,7 @@ export async function commitPatchToD1(
   const novelQuadIds: string[] = [];
 
   if (targetedInsertions.length) {
-    const proposedQuadIds = await hashQuads(targetedInsertions);
+    const proposedQuadIds = proposedInsertionQuadIds;
     const existingIds = await queryCachePresence(
       connection,
       proposedQuadIds,
@@ -157,12 +165,7 @@ export async function commitPatchToD1(
     derivedInserted = await stageDerivedRows(batchExecutor, worldId, plan);
   }
 
-  try {
-    await batchExecutor.flush();
-  } catch (cause) {
-    const detail = cause instanceof Error ? cause.message : String(cause);
-    throw new Error(`failed to execute D1 batch: ${detail}`, { cause });
-  }
+  await batchExecutor.flush();
 
   return {
     novelInsertions,
