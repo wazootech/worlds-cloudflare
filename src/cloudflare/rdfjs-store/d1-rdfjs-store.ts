@@ -17,6 +17,7 @@ import {
   insertD1Quad,
 } from "./d1-rdfjs-store-patch.ts";
 import { D1WriteQueue } from "./d1-write-queue.ts";
+import { validateWorldId } from "@/cloudflare/validate-world-id.ts";
 import { applyD1Schema } from "./d1-rdfjs-store-lifecycle.ts";
 import {
   collectQuads,
@@ -90,6 +91,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
   private readonly writes: D1WriteQueue;
 
   public constructor(options: D1RdfjsStoreOptions) {
+    validateWorldId(options.worldId, "D1RdfjsStore");
     this.connection = options.connection;
     this.matchPageSize = options.matchPageSize ?? DEFAULT_D1_MATCH_PAGE_SIZE;
     this.writeBatchSize = options.maxWriteBatchSize ??
