@@ -3,6 +3,7 @@ import { hashQuads } from "@worlds/sdk/quad-store";
 import {
   D1BatchExecutor,
   DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
+  effectiveLookupChunkSize,
 } from "@/cloudflare/d1/d1-batch-executor.ts";
 import {
   emptyVectorSyncReport,
@@ -86,7 +87,10 @@ export async function refreshSearchChunksForQuads(
     };
   }
 
-  const lookupChunkSize = options.maxLookupChunkSize ?? 100;
+  const lookupChunkSize = effectiveLookupChunkSize(
+    options.maxLookupChunkSize,
+    Boolean(options.worldId),
+  );
   const writeBatchSize = options.maxWriteBatchSize ??
     DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
 

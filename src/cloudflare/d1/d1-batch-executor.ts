@@ -1,11 +1,27 @@
 import type { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
 import type { D1Statement } from "@/cloudflare/d1/d1-connection-driver.ts";
 
-/** DEFAULT_MAX_LOOKUP_CHUNK_SIZE is the default IN-clause and deletion chunk width (100 params/statement cap). */
+/** DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE is the default IN-clause and deletion chunk width (100 params/statement cap). */
 export const DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE = 100;
 
 /** DEFAULT_D1_MAX_WRITE_BATCH_SIZE limits statements per D1 batch() call (100 = the D1 batch cap). */
 export const DEFAULT_D1_MAX_WRITE_BATCH_SIZE = 100;
+
+/**
+ * effectiveLookupChunkSize resolves the IN-clause chunk width for a statement
+ * run. The documented cap is host parameters per statement; world-scoped
+ * statements also bind world_id, so reserve one slot for it.
+ */
+export function effectiveLookupChunkSize(
+  maxLookupChunkSize: number | undefined,
+  worldScoped: boolean,
+): number {
+  return Math.max(
+    1,
+    (maxLookupChunkSize ?? DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE) -
+      (worldScoped ? 1 : 0),
+  );
+}
 
 /** STAGING_FLUSH_THRESHOLD flushes staged SQL during large commits to avoid huge in-memory arrays. */
 export const STAGING_FLUSH_THRESHOLD = 10_000;
