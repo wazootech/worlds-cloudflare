@@ -7,7 +7,15 @@
   "lock": {
     "includePlatform": true
   },
-  "minimumDependencyAge": 0,
+  "minimumDependencyAge": {
+    "age": "P1D",
+    "exclude": [
+      "jsr:@wazoo/reasoner",
+      "jsr:@wazoo/sparql-engine",
+      "jsr:@worlds/sqlite",
+      "jsr:@worlds/sdk"
+    ]
+  },
   "exports": {
     ".": "./src/mod.ts",
     "./quad-store": "./src/cloudflare/quad-store/mod.ts",
