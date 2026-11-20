@@ -1,10 +1,5 @@
-import type * as rdfjs from "@rdfjs/types";
 import type { Patch, TransactionContext } from "@worlds/sdk/quad-store";
-import {
-  filterQuads,
-  hashQuads,
-  isReplaceImportCommit,
-} from "@worlds/sdk/quad-store";
+import { hashQuads, isReplaceImportCommit } from "@worlds/sdk/quad-store";
 import {
   D1BatchExecutor,
   DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
@@ -28,34 +23,45 @@ import type {
 } from "./commit-patch-to-d1-types.ts";
 import {
   executeReplaceImportWipe,
-  queryCachePresence,
   stageChunked,
   stageDerivedRows,
   stageNovelInsertions,
 } from "./commit-patch-to-d1-helpers.ts";
+import { type D1CommitPlan, planD1Commit } from "./commit-patch-to-d1-plan.ts";
 
 export type {
   CommitPatchToD1Options,
   CommitPatchToD1Result,
 } from "./commit-patch-to-d1-types.ts";
+export { type D1CommitPlan, planD1Commit } from "./commit-patch-to-d1-plan.ts";
 
 /**
- * commitPatchToD1 commits additions and removals exclusively for D1 quads.
- * It returns the novel insertions and touched subjects to be processed by independent search projection.
+ * commitPatchToD1 plans and applies a patch exclusively for D1 quads.
+ * It returns the novel insertions to be processed by independent search projection.
  */
 export async function commitPatchToD1(
   patch: Patch,
   options: CommitPatchToD1Options,
   context?: TransactionContext,
 ): Promise<CommitPatchToD1Result> {
-  const {
-    connection,
-    maxLookupChunkSize,
-    maxWriteBatchSize,
-    include,
-    exclude,
-    worldId,
-  } = options;
+  const plan = await planD1Commit(patch, options, context);
+  return await applyD1Commit(plan, options, context);
+}
+
+/**
+ * applyD1Commit writes a plan from planD1Commit: the replace-import wipe, the
+ * inference plan, deletions, novel insertions, and derived rows. The plan's
+ * filtering, hashing, and presence lookup already ran, so the first write here
+ * is the first change to the world.
+ */
+export async function applyD1Commit(
+  plan: D1CommitPlan,
+  options: CommitPatchToD1Options,
+  context?: TransactionContext,
+): Promise<CommitPatchToD1Result> {
+  const { connection, maxLookupChunkSize, maxWriteBatchSize, worldId } =
+    options;
+  const { prepared, novelInsertions, novelQuadIds } = plan;
   // The documented cap is host parameters per statement; world-scoped
   // statements also bind world_id, so reserve one slot for it.
   const lookupChunkSize = effectiveLookupChunkSize(
@@ -63,53 +69,33 @@ export async function commitPatchToD1(
     Boolean(worldId),
   );
   const writeBatchSize = maxWriteBatchSize ?? DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
-
   const batchExecutor = new D1BatchExecutor({ connection, writeBatchSize });
-
-  const matcher = filterQuads({ include, exclude });
-
-  const targetedDeletions = patch.deletions?.filter(matcher) ?? [];
-  const targetedInsertions = patch.insertions?.filter(matcher) ?? [];
-
-  // Pure, fallible prep runs BEFORE the replace-import wipe so a throw here
-  // (matcher on malformed input, hashing) cannot leave the world wiped with no
-  // replacement data committed. Only DB reads and the inference plan remain
-  // after the wipe, because both must observe post-wipe state.
-  const deletionQuadIds = new Set<string>();
-  if (targetedDeletions.length) {
-    const computedDeletionQuadIds = await hashQuads(targetedDeletions);
-    for (const quadId of computedDeletionQuadIds) {
-      deletionQuadIds.add(quadId);
-    }
-  }
-  const proposedInsertionQuadIds = targetedInsertions.length
-    ? await hashQuads(targetedInsertions)
-    : [];
+  const deletionQuadIds = new Set(prepared.deletionIds);
 
   if (isReplaceImportCommit(context)) {
     await executeReplaceImportWipe(connection, writeBatchSize, worldId);
   }
 
-  // Inference runs before any write so a size-guard failure leaves the world
-  // untouched. It reads the asserted quads as they are after any replace wipe.
+  // Inference runs before any staged write so a size-guard failure leaves the
+  // world untouched. It reads the asserted quads as they are after any replace wipe.
   const inference = options.inference?.enabled ? options.inference : undefined;
-  let plan: InferencePlan | undefined;
+  let inferencePlan: InferencePlan | undefined;
   if (inference) {
     const assertedBefore = await loadAssertedQuads(connection, {
       worldId,
       maxAssertedQuads: inference.maxAssertedQuads ??
         DEFAULT_MAX_ASSERTED_QUADS,
-      pendingInsertions: targetedInsertions.length,
+      pendingInsertions: prepared.insertions.length,
     });
-    plan = planInference({
+    inferencePlan = planInference({
       assertedBefore,
-      deletions: targetedDeletions,
-      insertions: targetedInsertions,
+      deletions: prepared.deletions,
+      insertions: prepared.insertions,
       graphs: inference.graphs,
     });
   }
 
-  if (targetedDeletions.length && deletionQuadIds.size > 0) {
+  if (deletionQuadIds.size > 0) {
     await stageChunked(
       batchExecutor,
       [...deletionQuadIds],
@@ -118,51 +104,33 @@ export async function commitPatchToD1(
     );
   }
 
-  if (plan && plan.derivedToRemove.length > 0) {
+  if (inferencePlan && inferencePlan.derivedToRemove.length > 0) {
     await stageChunked(
       batchExecutor,
-      await hashQuads(plan.derivedToRemove),
+      hashQuads(inferencePlan.derivedToRemove),
       lookupChunkSize,
       (chunk) => [buildDeleteDerivedQuadsByQuadIds(chunk, worldId)],
     );
   }
 
-  const novelInsertions: rdfjs.Quad[] = [];
-  const novelQuadIds: string[] = [];
-
-  if (targetedInsertions.length) {
-    const proposedQuadIds = proposedInsertionQuadIds;
-    const existingIds = await queryCachePresence(
-      connection,
-      proposedQuadIds,
+  await stageNovelInsertions(
+    {
+      batchExecutor,
       lookupChunkSize,
       worldId,
-      inference !== undefined,
-    );
-
-    for (let i = 0; i < targetedInsertions.length; i++) {
-      const id = proposedQuadIds[i];
-      if (!existingIds.has(id) || deletionQuadIds.has(id)) {
-        novelInsertions.push(targetedInsertions[i]);
-        novelQuadIds.push(id);
-      }
-    }
-
-    await stageNovelInsertions(
-      {
-        batchExecutor,
-        lookupChunkSize,
-        worldId,
-        inferenceEnabled: inference !== undefined,
-      },
-      novelInsertions,
-      novelQuadIds,
-    );
-  }
+      inferenceEnabled: inference !== undefined,
+    },
+    novelInsertions,
+    novelQuadIds,
+  );
 
   let derivedInserted = 0;
-  if (plan) {
-    derivedInserted = await stageDerivedRows(batchExecutor, worldId, plan);
+  if (inferencePlan) {
+    derivedInserted = await stageDerivedRows(
+      batchExecutor,
+      worldId,
+      inferencePlan,
+    );
   }
 
   await batchExecutor.flush();
@@ -170,11 +138,11 @@ export async function commitPatchToD1(
   return {
     novelInsertions,
     novelQuadIds,
-    ...(plan && {
+    ...(inferencePlan && {
       inference: {
         derivedInserted,
-        derivedRemoved: plan.derivedToRemove.length,
-        inconsistencies: plan.inconsistencies,
+        derivedRemoved: inferencePlan.derivedToRemove.length,
+        inconsistencies: inferencePlan.inconsistencies,
       },
     }),
   };

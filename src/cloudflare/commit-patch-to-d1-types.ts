@@ -7,7 +7,7 @@ export interface CommitPatchToD1Options extends D1ClientBaseOptions {
   /** connection is the D1ConnectionDriver wrapping the D1 binding. */
   connection: D1ConnectionDriver;
 
-  /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 100 (D1's batch cap). */
+  /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 100, a chosen chunk size: Cloudflare documents no per-batch statement cap (100 is the bound-parameter limit per statement). */
   maxWriteBatchSize?: number;
 
   /** worldId scopes this commit to one logical world. */

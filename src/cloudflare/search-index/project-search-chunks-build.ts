@@ -1,6 +1,5 @@
 import type * as rdfjs from "@rdfjs/types";
-import type { ChunkRowPayload } from "@worlds/sdk/search-index/quad-chunker";
-import { chunkQuads } from "@worlds/sdk/search-index/quad-chunker";
+import { chunkAndEmbedQuads } from "@worlds/sdk/search-index/quad-chunker";
 import { buildChunkFtsValue } from "@worlds/sqlite/sql-core";
 import { buildSearchResultId } from "@worlds/sqlite/sql-core";
 import type { D1SearchQueryBuilder } from "./d1-search-query-builder.ts";
@@ -29,6 +28,14 @@ export function buildChunkDeletionStatementsChunked(
   return statements;
 }
 
+/**
+ * buildChunkStatements chunks and embeds `quads` with the shared helper before
+ * any write, and returns the chunk insert statements plus the vectors to sync
+ * to the outside-D1 index. An embedding failure degrades: the chunks are kept
+ * keyword-only and the failure is counted in the report (reindex repairs it).
+ * Embedding runs only when both an embedding service and a vector index are
+ * wired; the vector length is checked against the chunk table's width.
+ */
 export async function buildChunkStatements(
   quads: rdfjs.Quad[],
   quadIds: string[],
@@ -42,44 +49,23 @@ export async function buildChunkStatements(
   const vectorEntries: VectorSearchEntry[] = [];
   const report = emptyVectorSyncReport(vectorSyncEnabled(options));
 
-  let chunks: ChunkRowPayload[];
-  try {
-    chunks = await chunkQuads(quads, options.textSplitter, quadIds);
-  } catch (cause) {
-    throw new Error("failed to chunk novel textual facts", { cause });
+  const { rows, embeddingError } = await chunkAndEmbedQuads(quads, quadIds, {
+    textSplitter: options.textSplitter,
+    embeddingService: vectorSyncEnabled(options)
+      ? options.embeddingService
+      : undefined,
+    ftsValueOf: buildChunkFtsValue,
+    vectorDimensions: options.vectorDimensions ??
+      options.searchQueryBuilder.vectorDimensions,
+    onEmbeddingFailure: "degrade",
+  });
+  if (embeddingError !== undefined) {
+    report.embeddingFailures += rows.length;
+    recordVectorSyncError(report, "embed", embeddingError);
   }
 
-  if (chunks.length === 0) {
-    return { statements, vectorEntries, report };
-  }
-
-  const chunksWithFtsValue = chunks.map((chunk) => ({
-    chunk,
-    fts_value: buildChunkFtsValue(chunk),
-  }));
-
-  // Phase C: embed chunk text only when both an embedding service and a
-  // vector index are wired. Embedding failure stores the chunks without
-  // vectors (keyword-only) and is counted in the report; reindex repairs it.
-  let vectors: Array<Float32Array | undefined> | undefined;
-  let embedFailed = false;
-  if (options.embeddingService && options.vectorSearch) {
-    try {
-      const embedded = await options.embeddingService.embed(
-        chunksWithFtsValue.map(({ chunk }) => chunk.value),
-      );
-      vectors = embedded.map((vector) => new Float32Array(vector));
-    } catch (error) {
-      embedFailed = true;
-      report.embeddingFailures += chunksWithFtsValue.length;
-      recordVectorSyncError(report, "embed", error);
-    }
-  }
-
-  for (let index = 0; index < chunksWithFtsValue.length; index++) {
-    const { chunk, fts_value } = chunksWithFtsValue[index];
-    const vector = embedFailed ? undefined : vectors?.[index];
-
+  for (const { chunk, ftsValue, vector: embedded } of rows) {
+    const vector = embedded ? new Float32Array(embedded) : undefined;
     statements.push(
       options.searchQueryBuilder.buildInsertChunk({
         quad_id: chunk.quad_id,
@@ -87,7 +73,7 @@ export async function buildChunkStatements(
         predicate: chunk.predicate,
         graph: chunk.graph,
         value: chunk.value,
-        fts_value,
+        fts_value: ftsValue,
         vector,
         world_id: options.worldId,
       }),

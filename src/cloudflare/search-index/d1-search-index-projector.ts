@@ -1,6 +1,11 @@
 import type * as rdfjs from "@rdfjs/types";
 import type { ProjectSearchChunksOptions } from "./project-search-chunks.ts";
-import { projectSearchChunks } from "./project-search-chunks.ts";
+import {
+  type PreparedSearchChunks,
+  prepareSearchChunks,
+  projectSearchChunks,
+  writeSearchChunks,
+} from "./project-search-chunks.ts";
 import { purgeWorldVectors } from "./project-search-chunks-vectors.ts";
 import { rebuildD1SearchIndexFromQuads } from "./rebuild-d1-search-index-from-quads.ts";
 import type { VectorSyncReport } from "./vector-sync-report.ts";
@@ -35,6 +40,32 @@ export class D1SearchIndexProjector {
       );
     }
     return undefined;
+  }
+
+  /**
+   * prepareProjection chunks and embeds novel quads without writing anything,
+   * so a commit can do it before its first write. Returns undefined when there
+   * are no novel quads.
+   */
+  public async prepareProjection(
+    novelInsertions: rdfjs.Quad[],
+    novelQuadIds: string[],
+  ): Promise<PreparedSearchChunks | undefined> {
+    if (novelQuadIds.length === 0) return undefined;
+    return await prepareSearchChunks(
+      novelInsertions,
+      novelQuadIds,
+      this.options,
+    );
+  }
+
+  /**
+   * writeProjection stores chunk rows from prepareProjection and syncs their vectors.
+   */
+  public async writeProjection(
+    prepared: PreparedSearchChunks,
+  ): Promise<VectorSyncReport> {
+    return await writeSearchChunks(prepared, this.options);
   }
 
   /**

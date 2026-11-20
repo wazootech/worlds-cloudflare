@@ -10,8 +10,12 @@ import {
   importViaTransaction,
   Transaction,
 } from "@worlds/sdk/quad-store";
-import { commitPatchToD1 } from "@/cloudflare/commit-patch-to-d1.ts";
+import {
+  applyD1Commit,
+  planD1Commit,
+} from "@/cloudflare/commit-patch-to-d1.ts";
 import { isReplaceImportCommit } from "@worlds/sdk/quad-store";
+import { planSearchIndexing } from "@worlds/sdk/search-index";
 import type { D1ClientBaseOptions } from "@/cloudflare/d1-client-base-options.ts";
 import type { D1ConnectionDriver } from "@/cloudflare/d1/d1-connection-driver.ts";
 import type { D1RdfjsStore } from "@/cloudflare/rdfjs-store/mod.ts";
@@ -86,18 +90,27 @@ export class D1QuadStore implements QuadStoreInterface {
   public createTransaction(): Transaction {
     return new Transaction({
       commit: async (patch, context) => {
-        const isImport = context?.importMode !== undefined;
-        const searchIndexOnImport = this.options.searchIndexOnImport ??
-          "deferred";
-        const skipSearchIndexProjection =
-          this.options.searchIndexOnImport === "disabled" ||
-          (isImport && searchIndexOnImport === "deferred");
-
-        const { novelInsertions, novelQuadIds } = await commitPatchToD1(
-          patch,
-          { ...this.options, worldId: this.options.worldId },
+        // D1 defaults to "deferred": an import skips chunk projection and
+        // rebuilds the index once afterwards.
+        const indexing = planSearchIndexing(
+          this.options.searchIndexOnImport,
           context,
+          { defaultMode: "deferred" },
         );
+        const projector = this.options.searchIndexProjector;
+        const options = { ...this.options, worldId: this.options.worldId };
+
+        // Read-only work first: filter, hash, select the novel quads, then
+        // chunk and embed them. A failure in any of it leaves D1 untouched.
+        const plan = await planD1Commit(patch, options, context);
+        const projection = indexing.projectDuringCommit && projector
+          ? await projector.prepareProjection(
+            plan.novelInsertions,
+            plan.novelQuadIds,
+          )
+          : undefined;
+
+        await applyD1Commit(plan, options, context);
 
         // A replace-import wipe deletes quads and chunk rows, but the vector
         // ids of the removed content are unrecoverable afterwards, so its
@@ -105,13 +118,11 @@ export class D1QuadStore implements QuadStoreInterface {
         // them here unless a reindex follows: the deferred reindex purges and
         // re-upserts itself. Purge failures are logged drift, never thrown.
         if (
-          isReplaceImportCommit(context) && !skipSearchIndexProjection &&
-          this.options.searchIndexProjector &&
-          !(isImport && searchIndexOnImport === "deferred")
+          isReplaceImportCommit(context) && indexing.projectDuringCommit &&
+          projector
         ) {
           try {
-            const purge = await this.options.searchIndexProjector
-              .purgeVectors();
+            const purge = await projector.purgeVectors();
             if (purge.staleDeleteFailures > 0) {
               console.error(
                 "[vector-sync] replace-import vector purge failed; run reindex to repair",
@@ -126,24 +137,19 @@ export class D1QuadStore implements QuadStoreInterface {
           }
         }
 
-        if (!skipSearchIndexProjection && this.options.searchIndexProjector) {
+        if (projection && projector) {
           try {
-            await this.options.searchIndexProjector.projectNovelQuads(
-              novelInsertions,
-              novelQuadIds,
-            );
+            await projector.writeProjection(projection);
           } catch (error) {
-            // Clean up chunk rows if search projection fails
-            await stageChunkedDeletions(novelQuadIds, this.options);
+            // The quads are committed (D1 cannot roll back across batches);
+            // remove the chunk rows so none refers to a half-projected quad.
+            await stageChunkedDeletions(plan.novelQuadIds, this.options);
             throw error;
           }
         }
 
-        if (
-          isImport && searchIndexOnImport === "deferred" &&
-          this.options.searchIndexProjector
-        ) {
-          await this.options.searchIndexProjector.reindexAll();
+        if (indexing.reindexAfterCommit && projector) {
+          await projector.reindexAll();
         }
       },
     });
