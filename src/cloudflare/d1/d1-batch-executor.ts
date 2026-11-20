@@ -4,7 +4,7 @@ import type { D1Statement } from "@/cloudflare/d1/d1-connection-driver.ts";
 /** DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE is the default IN-clause and deletion chunk width (100 params/statement cap). */
 export const DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE = 100;
 
-/** DEFAULT_D1_MAX_WRITE_BATCH_SIZE limits statements per D1 batch() call (100 = the D1 batch cap). */
+/** DEFAULT_D1_MAX_WRITE_BATCH_SIZE limits statements per D1 batch() call (a chosen chunk size; D1 documents no per-batch statement cap, and 100 is its bound-parameter limit per statement). */
 export const DEFAULT_D1_MAX_WRITE_BATCH_SIZE = 100;
 
 /**
@@ -72,8 +72,9 @@ export class D1BatchExecutor {
 
   /**
    * flush executes and clears all currently staged write statements.
-   * D1's atomic unit is a single batch() call capped at 100 statements, so
-   * staged statements are chunked by writeBatchSize and executed sequentially.
+   * D1's atomic unit is a single batch() call (documented as a transaction),
+   * so staged statements are chunked by writeBatchSize and executed
+   * sequentially: a commit larger than one chunk is not atomic.
    *
    * A failure mid-stream leaves the commit partially applied (statements before
    * the failed batch committed; the rest never ran). The executor records that

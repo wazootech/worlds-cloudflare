@@ -31,7 +31,7 @@
     "@wazoo/reasoner": "jsr:@wazoo/reasoner@^0.4.1",
     "@wazoo/sparql-engine": "jsr:@wazoo/sparql-engine@^0.5.0",
     "@worlds/sqlite": "jsr:@worlds/sqlite@^0.6.0",
-    "@worlds/sdk": "jsr:@worlds/sdk@^0.9.0",
+    "@worlds/sdk": "jsr:@worlds/sdk@^0.9.1",
     "miniflare": "npm:miniflare@^4.20260730.0"
   },
   "publish": {

@@ -26,22 +26,33 @@ import {
 
 export type { ProjectSearchChunksOptions } from "./project-search-chunks-options.ts";
 
+/** PreparedSearchChunks is chunked and embedded text that has not been written yet. */
+export type PreparedSearchChunks = Awaited<
+  ReturnType<typeof buildChunkStatements>
+>;
+
 /**
- * projectSearchChunks processes novel quads to create and store FTS chunks
- * plus embedded vectors (when an embeddingService + vectorSearch are wired).
- * Vector sync failures never fail an import (D1 stays the source of truth),
- * but they are counted in the returned report and logged as drift.
+ * prepareSearchChunks chunks and embeds novel quads without touching D1 or the
+ * vector index, so a caller can do it before any write. See buildChunkStatements.
  */
-export async function projectSearchChunks(
+export async function prepareSearchChunks(
   novelInsertions: rdfjs.Quad[],
   novelQuadIds: string[],
   options: ProjectSearchChunksOptions,
+): Promise<PreparedSearchChunks> {
+  return await buildChunkStatements(novelInsertions, novelQuadIds, options);
+}
+
+/**
+ * writeSearchChunks stores prepared chunk rows and syncs their vectors to the
+ * outside-D1 index. Vector sync failures never fail an import (D1 stays the
+ * source of truth), but they are counted in the returned report and logged as
+ * drift.
+ */
+export async function writeSearchChunks(
+  built: PreparedSearchChunks,
+  options: ProjectSearchChunksOptions,
 ): Promise<VectorSyncReport> {
-  const built = await buildChunkStatements(
-    novelInsertions,
-    novelQuadIds,
-    options,
-  );
   const chunkStatements = built.statements;
   const vectorEntries = built.vectorEntries;
 
@@ -69,6 +80,23 @@ export async function projectSearchChunks(
     operation: "import",
   });
   return report;
+}
+
+/**
+ * projectSearchChunks processes novel quads to create and store FTS chunks
+ * plus embedded vectors (when an embeddingService + vectorSearch are wired).
+ */
+export async function projectSearchChunks(
+  novelInsertions: rdfjs.Quad[],
+  novelQuadIds: string[],
+  options: ProjectSearchChunksOptions,
+): Promise<VectorSyncReport> {
+  const built = await prepareSearchChunks(
+    novelInsertions,
+    novelQuadIds,
+    options,
+  );
+  return await writeSearchChunks(built, options);
 }
 
 /**
