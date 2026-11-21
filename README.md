@@ -64,9 +64,14 @@ consumers:
 - **Deleting a quad leaves its chunk rows** until a reindex or the hosted API's
   orphan cleanup, because those rows are the only record of the Vectorize ids to
   remove.
-- **`searchIndexOnImport` defaults to `"deferred"`** (set explicitly, not the
-  shared `"incremental"`): an import persists quads first and rebuilds the index
-  once afterwards. Moving to the shared default is a separate change.
+- **`searchIndexOnImport` defaults to `"incremental"`**, the shared default: an
+  import projects chunks and embeds only the quads it writes, so a failed
+  embedding throws before anything is written. `"deferred"` (persist quads, then
+  rebuild the whole world's index) is an option, not the default. Measured on
+  miniflare (worlds-cloudflare#92), `incremental` issues the same number of
+  statements and about the same number of `batch()` calls as `deferred`, embeds
+  fewer texts when merging into a populated world, and leaves nothing behind
+  when embedding fails; `deferred` leaves quads without chunk rows.
 
 This package consumes the shared, driver-free SQL plan layer from
 [`@worlds/sqlite/sql-core`](https://jsr.io/@worlds/sqlite) — the FTS5

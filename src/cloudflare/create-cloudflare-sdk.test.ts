@@ -85,7 +85,7 @@ Deno.test("createCloudflareWorldsSdk - keyword search over imported literals", a
   }
 });
 
-Deno.test("createCloudflareWorldsSdk - SPARQL insert triggers search projection (deferred reindex)", async () => {
+Deno.test("createCloudflareWorldsSdk - SPARQL insert triggers search projection", async () => {
   const { sdk, dispose } = await createTestWorldsSdk();
   try {
     await sdk.sparql({
