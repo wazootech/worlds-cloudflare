@@ -1,9 +1,9 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
-import { hashQuad } from "@worlds/sdk/quad-store";
 import type { Patch, TransactionContext } from "@worlds/sdk/quad-store";
 import { runCommitConformanceSuite } from "@worlds/sdk/testing";
 import type {
+  CommitConformanceContract,
   CommitConformanceCreateOptions,
   CommitConformanceSubject,
 } from "@worlds/sdk/testing";
@@ -44,6 +44,9 @@ function tag(inner: D1PreparedStatementLike, sql: string): TaggedStatement {
 export interface FailingD1 {
   database: D1DatabaseLike;
 
+  /** fullRebuilds counts the full search-index rebuilds that started: a first page read of every stored quad. */
+  fullRebuilds(): number;
+
   /** failWriteAfter makes the write batch after `skip` more write batches fail once. A replace wipe never counts. */
   failWriteAfter(skip: number): void;
 }
@@ -56,12 +59,21 @@ export interface FailingD1 {
  */
 export function failingD1(database: D1DatabaseLike): FailingD1 {
   let skip: number | undefined;
+  let rebuilds = 0;
   return {
+    fullRebuilds: () => rebuilds,
     failWriteAfter: (count) => {
       skip = count;
     },
     database: {
-      prepare: (sql) => tag(database.prepare(sql), sql),
+      prepare: (sql) => {
+        if (
+          sql.includes("ORDER BY quad_id ASC") && !sql.includes("quad_id >")
+        ) {
+          rebuilds++;
+        }
+        return tag(database.prepare(sql), sql);
+      },
       exec: (sql) => database.exec(sql),
       batch: (statements) => {
         const tagged = statements as TaggedStatement[];
@@ -79,16 +91,6 @@ export function failingD1(database: D1DatabaseLike): FailingD1 {
   };
 }
 
-/** CountingProjector counts full search-index rebuilds. */
-class CountingProjector extends D1SearchIndexProjector {
-  public rebuilds = 0;
-
-  public override async reindexAll(): Promise<void> {
-    this.rebuilds++;
-    await super.reindexAll();
-  }
-}
-
 /** D1TestSubject is the conformance subject plus its teardown and failure hook. */
 export interface D1TestSubject extends CommitConformanceSubject {
   failWriteAfter(skip: number): void;
@@ -97,15 +99,16 @@ export interface D1TestSubject extends CommitConformanceSubject {
 
 /** createD1Subject wires a miniflare D1 world with chunk and vector projection. */
 export async function createD1Subject(
-  options: CommitConformanceCreateOptions,
+  options: CommitConformanceCreateOptions & { maxWriteBatchSize?: number },
 ): Promise<D1TestSubject> {
   const substrate = await createTestD1();
   const failing = failingD1(substrate.database);
+  let readerPages = 0;
   const connection = new D1ConnectionDriver(failing.database);
   const store = new D1RdfjsStore({ connection });
   await store.ensureSchema();
   const searchQueryBuilder = new D1SearchQueryBuilder(32);
-  const projector = new CountingProjector({
+  const projector = new D1SearchIndexProjector({
     connection,
     searchQueryBuilder,
     textSplitter: new RecursiveCharacterTextSplitter({ chunkSize: 1000 }),
@@ -119,6 +122,7 @@ export async function createD1Subject(
     searchQueryBuilder,
     searchIndexProjector: projector,
     searchIndexOnImport: options.searchIndexOnImport,
+    maxWriteBatchSize: options.maxWriteBatchSize,
   });
   return {
     commit: async (patch: Patch, context?: TransactionContext) => {
@@ -127,7 +131,13 @@ export async function createD1Subject(
         .removeQuads(patch.deletions ?? [])
         .commit(context);
     },
-    storedQuads: () => store.getQuads(),
+    storedQuads: async () => {
+      // The store's own paged read looks like a rebuild's first page; don't count it.
+      const before = failing.fullRebuilds();
+      const quads = await store.getQuads();
+      readerPages += failing.fullRebuilds() - before;
+      return quads;
+    },
     chunkedQuadIds: async () => {
       const { rows } = await connection.execute({
         sql: "SELECT quad_id FROM chunks",
@@ -136,45 +146,66 @@ export async function createD1Subject(
     },
     failNextWrite: () => failing.failWriteAfter(0),
     failWriteAfter: (skip) => failing.failWriteAfter(skip),
-    fullRebuildCount: () => projector.rebuilds,
+    fullRebuildCount: () => failing.fullRebuilds() - readerPages,
     dispose: substrate.dispose,
   };
 }
 
 const disposers: Array<() => Promise<void>> = [];
 
-async function create(options: CommitConformanceCreateOptions) {
-  const subject = await createD1Subject(options);
-  disposers.push(subject.dispose);
-  return subject;
+/** createWith returns a subject factory whose commits batch at most `maxWriteBatchSize` statements. */
+function createWith(maxWriteBatchSize?: number) {
+  return async (options: CommitConformanceCreateOptions) => {
+    const subject = await createD1Subject({ ...options, maxWriteBatchSize });
+    disposers.push(subject.dispose);
+    return subject;
+  };
 }
 
 async function disposeAll() {
   for (const dispose of disposers.splice(0)) await dispose();
 }
 
-/**
- * D1's real contract. A commit is a sequence of D1 `batch()` calls, one per
- * `writeBatchSize` statements, so it is not atomic; a replace import wipes in
- * its own batch first, so a later failure leaves an empty graph; embedding
- * failures degrade to keyword-only chunks; and imports default to "deferred".
- */
-Deno.test("D1 satisfies the shared commit conformance suite", async () => {
+async function runSuite(
+  maxWriteBatchSize: number | undefined,
+  contract: CommitConformanceContract,
+) {
   try {
     const report = await runCommitConformanceSuite({
-      create,
-      contract: {
-        atomic: false,
-        embeddingFailure: "degrades",
-        replaceImportFailure: "empties-graph",
-        defaultSearchIndexOnImport: "deferred",
-      },
+      create: createWith(maxWriteBatchSize),
+      contract,
     });
     const failed = report.results.filter((r) => !r.ok);
     assert(report.ok, `conformance failures: ${JSON.stringify(failed)}`);
   } finally {
     await disposeAll();
   }
+}
+
+/**
+ * D1's contract. A commit that fits in one `batch()` call (the write batch
+ * size, 100 statements by default) is atomic, and a failed replace import
+ * keeps the old graph. A larger commit takes the shared core's chunked
+ * fallback, which is not atomic and leaves an empty graph if a replace import
+ * fails after its wipe. Embedding failures throw; imports default to "deferred".
+ */
+Deno.test("D1 satisfies the shared commit conformance suite on the atomic path", async () => {
+  await runSuite(undefined, {
+    atomic: true,
+    embeddingFailure: "throws",
+    replaceImportFailure: "keeps-old-graph",
+    defaultSearchIndexOnImport: "deferred",
+  });
+});
+
+Deno.test("D1 satisfies the shared commit conformance suite on the chunked fallback path", async () => {
+  // One statement per batch sends every commit down the fallback.
+  await runSuite(1, {
+    atomic: false,
+    embeddingFailure: "throws",
+    replaceImportFailure: "empties-graph",
+    defaultSearchIndexOnImport: "deferred",
+  });
 });
 
 const { namedNode, literal, quad } = DataFactory;
@@ -189,21 +220,21 @@ const two = quad(
   literal("two"),
 );
 
-Deno.test("a failed chunk write keeps the committed quads and removes their chunk rows", async () => {
+Deno.test("a failed write after the first batch removes the novel quads and their chunk rows", async () => {
   const subject = await createD1Subject({
     searchIndexOnImport: "incremental",
     embeddingService: new FakeEmbeddingService(),
+    maxWriteBatchSize: 2,
   });
   try {
-    // Write 1 (the quads) succeeds; write 2 (the chunk rows) fails.
+    // Batch 1 (the first quads) succeeds; batch 2 fails; the cleanup removes batch 1.
     subject.failWriteAfter(1);
     await assertRejects(
       () => subject.commit({ insertions: [one, two], deletions: [] }),
       Error,
-      "search chunk sync batch",
+      "injected D1 write failure",
     );
-    const stored = (await subject.storedQuads()).map(hashQuad).sort();
-    assertEquals(stored, [hashQuad(one), hashQuad(two)].sort());
+    assertEquals(await subject.storedQuads(), []);
     assertEquals(await subject.chunkedQuadIds(), []);
   } finally {
     await subject.dispose();

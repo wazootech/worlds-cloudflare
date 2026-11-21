@@ -1,14 +1,14 @@
-import type * as rdfjs from "@rdfjs/types";
-import type { ProjectSearchChunksOptions } from "./project-search-chunks.ts";
+import type { SqlProjectionOptions } from "@worlds/sqlite/sql-core";
+import { D1VectorSync } from "./d1-vector-sync.ts";
 import {
-  type PreparedSearchChunks,
-  prepareSearchChunks,
-  projectSearchChunks,
-  writeSearchChunks,
-} from "./project-search-chunks.ts";
+  type ProjectSearchChunksOptions,
+  toProjectionOptions,
+} from "./project-search-chunks-options.ts";
 import { purgeWorldVectors } from "./project-search-chunks-vectors.ts";
 import { rebuildD1SearchIndexFromQuads } from "./rebuild-d1-search-index-from-quads.ts";
 import type { VectorSyncReport } from "./vector-sync-report.ts";
+
+export type { ProjectSearchChunksOptions } from "./project-search-chunks-options.ts";
 
 export interface D1SearchIndexProjectorOptions
   extends ProjectSearchChunksOptions {
@@ -16,56 +16,23 @@ export interface D1SearchIndexProjectorOptions
 }
 
 /**
- * D1SearchIndexProjector encapsulates search projection operations.
- * It manages FTS chunk generation and indexing synchronization decoupled
- * from the primary quad storage path.
+ * D1SearchIndexProjector holds what search projection needs beyond the shared
+ * SQL commit core: the chunking and embedding options, the outside-D1 vector
+ * sync, and the full rebuild. The commit itself runs in `commitD1Patch`.
  */
 export class D1SearchIndexProjector {
   public constructor(
     private readonly options: D1SearchIndexProjectorOptions,
   ) {}
 
-  /**
-   * projectNovelQuads processes new facts to project and index textual values.
-   */
-  public async projectNovelQuads(
-    novelInsertions: rdfjs.Quad[],
-    novelQuadIds: string[],
-  ): Promise<VectorSyncReport | undefined> {
-    if (novelQuadIds.length > 0) {
-      return await projectSearchChunks(
-        novelInsertions,
-        novelQuadIds,
-        this.options,
-      );
-    }
-    return undefined;
+  /** projection is the shared core's chunking and embedding configuration. */
+  public get projection(): SqlProjectionOptions {
+    return toProjectionOptions(this.options);
   }
 
-  /**
-   * prepareProjection chunks and embeds novel quads without writing anything,
-   * so a commit can do it before its first write. Returns undefined when there
-   * are no novel quads.
-   */
-  public async prepareProjection(
-    novelInsertions: rdfjs.Quad[],
-    novelQuadIds: string[],
-  ): Promise<PreparedSearchChunks | undefined> {
-    if (novelQuadIds.length === 0) return undefined;
-    return await prepareSearchChunks(
-      novelInsertions,
-      novelQuadIds,
-      this.options,
-    );
-  }
-
-  /**
-   * writeProjection stores chunk rows from prepareProjection and syncs their vectors.
-   */
-  public async writeProjection(
-    prepared: PreparedSearchChunks,
-  ): Promise<VectorSyncReport> {
-    return await writeSearchChunks(prepared, this.options);
+  /** createVectorSync starts a sync of chunk-row vectors to the outside-D1 index for one commit or rebuild. */
+  public createVectorSync(): D1VectorSync {
+    return new D1VectorSync(this.options);
   }
 
   /**
@@ -79,9 +46,7 @@ export class D1SearchIndexProjector {
 
   /**
    * purgeVectors deletes every vector this world holds in the outside-D1
-   * vector index (worlds-cloudflare#71 item 3). The commit hook calls it
-   * after a replace-import wipe when chunk projection runs incrementally; in
-   * deferred mode the reindex that follows reconciles vectors itself.
+   * vector index (worlds-cloudflare#71 item 3).
    */
   public async purgeVectors(): Promise<VectorSyncReport> {
     return await purgeWorldVectors(this.options);

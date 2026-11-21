@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { FakeEmbeddingService } from "@worlds/sdk/search-index/embedding-service";
@@ -135,20 +135,33 @@ Deno.test("#40 - a failed vector upsert keeps the import, logs drift, and reinde
   }
 });
 
-Deno.test("#40 - an embedding outage is counted, not hidden, and reindex re-embeds", async () => {
+Deno.test("#40 - an embedding outage throws: an import and a reindex write nothing new, and a retry succeeds", async () => {
   const ctx = await createContext();
   try {
     ctx.embeddingService.fail = true;
-    const logged = await captureErrors(() => ctx.importText("urn:b", "beta"));
-    assertEquals(await ctx.chunkCount(), 1);
-    assert(logged.includes('"embeddingFailures":1'), logged);
+    await assertRejects(
+      () => ctx.importText("urn:b", "beta"),
+      Error,
+      "failed to vectorize literal chunk blocks",
+    );
+    assertEquals(await ctx.chunkCount(), 0, "the failed import wrote nothing");
 
-    let response;
-    await captureErrors(async () => {
-      response = await ctx.searchIndex.reindex();
-    });
-    assertEquals(response!.vectorSync.embeddingFailures, 1);
-    assert(response!.vectorSync.errors[0].startsWith("embed:"));
+    ctx.embeddingService.fail = false;
+    await ctx.importText("urn:b", "beta");
+    assertEquals(await ctx.chunkCount(), 1);
+    assertEquals(ctx.vectorSearch.size, 1);
+
+    ctx.embeddingService.fail = true;
+    await assertRejects(
+      () => ctx.searchIndex.reindex(),
+      Error,
+      "failed to vectorize literal chunk blocks",
+    );
+    assertEquals(
+      await ctx.chunkCount(),
+      1,
+      "the failed reindex kept the chunk",
+    );
 
     ctx.embeddingService.fail = false;
     const repaired = await ctx.searchIndex.reindex();
