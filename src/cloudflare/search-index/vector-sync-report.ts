@@ -18,7 +18,11 @@ export interface VectorSyncReport {
   upserted: number;
   /** failedUpserts is the number of vectors whose upsert failed. */
   failedUpserts: number;
-  /** embeddingFailures is the number of chunks stored without a vector. */
+  /**
+   * embeddingFailures is always 0: an embedding failure now throws before
+   * anything is written, on D1 as on every backend. The field stays so
+   * consumers that validate the report's shape keep parsing it.
+   */
   embeddingFailures: number;
   /** staleDeleteFailures is the number of stale vectors that could not be removed. */
   staleDeleteFailures: number;

@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import type { EmbeddingService } from "@worlds/sdk/search-index/embedding-service";
@@ -97,24 +97,21 @@ Deno.test("identical chunk texts are embedded once per commit, and every quad ke
   }
 });
 
-Deno.test("a vector of the wrong length degrades to keyword-only chunks", async () => {
-  const errors: unknown[][] = [];
-  const original = console.error;
-  console.error = (...parts: unknown[]) => errors.push(parts);
+Deno.test("a vector of the wrong length rejects the commit before any write", async () => {
   const t = await setup({ embeddingService: embedder(8, []) });
   try {
-    await t.quadStore.createTransaction().addQuads([a]).commit({
-      importMode: "merge",
-    });
-    assertEquals((await t.store.getQuads()).length, 1);
-    assertEquals(await t.chunkCount(), 1, "the keyword chunk is kept");
-    assertEquals(t.vectorSearch.size, 0, "no vector is synced");
-    assert(
-      errors.some((e) => JSON.stringify(e).includes("does not match")),
-      "the length mismatch is logged as vector drift",
+    await assertRejects(
+      () =>
+        t.quadStore.createTransaction().addQuads([a]).commit({
+          importMode: "merge",
+        }),
+      Error,
+      "failed to vectorize literal chunk blocks",
     );
+    assertEquals((await t.store.getQuads()).length, 0);
+    assertEquals(await t.chunkCount(), 0);
+    assertEquals(t.vectorSearch.size, 0, "no vector is synced");
   } finally {
-    console.error = original;
     await t.substrate.dispose();
   }
 });

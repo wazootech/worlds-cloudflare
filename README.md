@@ -31,13 +31,42 @@ vector query is filtered on it, and vector ids are namespaced per world, so
 identical triple text in two worlds never shares a vector
 ([worlds-cloudflare#41](https://github.com/wazootech/worlds-cloudflare/issues/41)).
 
-**Vector sync is reported, not swallowed.** A failed embedding, vector upsert,
-or stale-vector delete never fails an import (D1 is the source of truth and
-keyword search keeps serving), but it is logged as a structured `[vector-sync]`
-error and counted. `CloudflareSearchIndex.reindex()` returns `vectorSync`
-(`attempted`, `upserted`, `failedUpserts`, `embeddingFailures`,
-`staleDeleteFailures`, `errors`), and rerunning reindex repairs the drift
+**Vector sync is reported, not swallowed.** A failed vector upsert or
+stale-vector delete never fails an import (D1 is the source of truth and keyword
+search keeps serving), but it is logged as a structured `[vector-sync]` error
+and counted. `CloudflareSearchIndex.reindex()` returns `vectorSync`
+(`attempted`, `upserted`, `failedUpserts`, `staleDeleteFailures`, `errors`;
+`embeddingFailures` is always 0, kept so report schemas keep parsing), and
+rerunning reindex repairs the drift
 ([worlds-cloudflare#40](https://github.com/wazootech/worlds-cloudflare/issues/40)).
+
+**An embedding failure throws.** Like every `worlds-*` backend, a commit or
+reindex whose embedding service fails (or returns vectors of the wrong length)
+rejects before anything is written, so the caller can retry. Writes therefore
+fail while the embedding service is down; there is no keyword-only fallback and
+no stale marker.
+
+**Commit path.** Commits run through the shared `commitSqlPatch` and reindex
+through `rebuildSqlSearchIndex` from `@worlds/sqlite/sql-core`; this package
+only supplies a D1 driver and dialect (`src/cloudflare/commit/`). Differences
+from the shared behavior, each forced by the platform or kept for hosted
+consumers:
+
+- **Atomicity is bounded by one `batch()` call.** D1's atomic unit is a single
+  `batch()`. A commit with at most `maxWriteBatchSize` statements (default 100,
+  a chosen size: D1 enforces no statement cap, only 100 bound parameters per
+  statement) is one atomic batch, including its chunk rows, and a failed replace
+  import keeps the old graph. A larger commit takes the core's chunked fallback:
+  not atomic, a failure removes the quads written so far, and a replace import
+  that fails after its wipe leaves an empty graph.
+- **Vectorize is outside D1.** Vectors sync after the D1 write lands, so a
+  Vectorize failure is logged drift (above), never a rollback.
+- **Deleting a quad leaves its chunk rows** until a reindex or the hosted API's
+  orphan cleanup, because those rows are the only record of the Vectorize ids to
+  remove.
+- **`searchIndexOnImport` defaults to `"deferred"`** (set explicitly, not the
+  shared `"incremental"`): an import persists quads first and rebuilds the index
+  once afterwards. Moving to the shared default is a separate change.
 
 This package consumes the shared, driver-free SQL plan layer from
 [`@worlds/sqlite/sql-core`](https://jsr.io/@worlds/sqlite) — the FTS5
@@ -101,9 +130,10 @@ const sdk = await createCloudflareWorldsSdk({
   closure, and reports counts and inconsistencies. It is idempotent, honors
   `maxAssertedQuads` before any write, and never touches asserted rows. The
   clear and the writes are separate batches, so after a failure run it again.
-- **Inconsistencies.** `commitPatchToD1` returns the reasoner's
-  `inconsistencies`; they do not block the write. SHACL validation does not
-  exist in this package; if added, it must run after inference.
+- **Inconsistencies.** `backfillInference` returns the reasoner's
+  `inconsistencies`; a commit does not report them and they do not block the
+  write. SHACL validation does not exist in this package; if added, it must run
+  after inference.
 
 ## Install
 
