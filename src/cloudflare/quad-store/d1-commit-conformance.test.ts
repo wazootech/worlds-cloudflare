@@ -187,14 +187,14 @@ async function runSuite(
  * size, 100 statements by default) is atomic, and a failed replace import
  * keeps the old graph. A larger commit takes the shared core's chunked
  * fallback, which is not atomic and leaves an empty graph if a replace import
- * fails after its wipe. Embedding failures throw; imports default to "deferred".
+ * fails after its wipe. Embedding failures throw; imports default to "incremental".
  */
 Deno.test("D1 satisfies the shared commit conformance suite on the atomic path", async () => {
   await runSuite(undefined, {
     atomic: true,
     embeddingFailure: "throws",
     replaceImportFailure: "keeps-old-graph",
-    defaultSearchIndexOnImport: "deferred",
+    defaultSearchIndexOnImport: "incremental",
   });
 });
 
@@ -204,7 +204,7 @@ Deno.test("D1 satisfies the shared commit conformance suite on the chunked fallb
     atomic: false,
     embeddingFailure: "throws",
     replaceImportFailure: "empties-graph",
-    defaultSearchIndexOnImport: "deferred",
+    defaultSearchIndexOnImport: "incremental",
   });
 });
 

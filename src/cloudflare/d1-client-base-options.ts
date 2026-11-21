@@ -57,8 +57,8 @@ export interface D1ClientBaseOptions extends QuadFilter {
   /**
    * searchIndexOnImport controls when FTS/vector chunk projection runs during import.
    *
-   * - `"incremental"`: chunks each quad on commit.
-   * - `"deferred"` (default for Cloudflare): persists quads on each import, rebuilds FTS/vector chunks in one pass afterward.
+   * - `"incremental"` (default): chunks each quad on commit, so an import embeds only the quads it writes.
+   * - `"deferred"`: persists quads on each import, then rebuilds FTS/vector chunks for the whole world in one pass.
    * - `"disabled"`: skips chunking entirely; caller calls `client.reindex()` before searching.
    */
   searchIndexOnImport?: SearchIndexOnImport;
