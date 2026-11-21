@@ -103,6 +103,7 @@ export async function createD1Subject(
 ): Promise<D1TestSubject> {
   const substrate = await createTestD1();
   const failing = failingD1(substrate.database);
+  let readerPages = 0;
   const connection = new D1ConnectionDriver(failing.database);
   const store = new D1RdfjsStore({ connection });
   await store.ensureSchema();
@@ -130,7 +131,13 @@ export async function createD1Subject(
         .removeQuads(patch.deletions ?? [])
         .commit(context);
     },
-    storedQuads: () => store.getQuads(),
+    storedQuads: async () => {
+      // The store's own paged read looks like a rebuild's first page; don't count it.
+      const before = failing.fullRebuilds();
+      const quads = await store.getQuads();
+      readerPages += failing.fullRebuilds() - before;
+      return quads;
+    },
     chunkedQuadIds: async () => {
       const { rows } = await connection.execute({
         sql: "SELECT quad_id FROM chunks",
@@ -139,7 +146,7 @@ export async function createD1Subject(
     },
     failNextWrite: () => failing.failWriteAfter(0),
     failWriteAfter: (skip) => failing.failWriteAfter(skip),
-    fullRebuildCount: failing.fullRebuilds,
+    fullRebuildCount: () => failing.fullRebuilds() - readerPages,
     dispose: substrate.dispose,
   };
 }
