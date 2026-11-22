@@ -34,6 +34,11 @@ export interface ReadProjectSearchChunksOptions
  *
  * Use after schema upgrades, label predicate changes, or discovery-index tuning so existing corpora pick up refreshed `fts_value`.
  *
+ * An unscoped rebuild clears the world's chunk rows first, so rows of quads
+ * that no longer exist go too. With an include/exclude filter the rebuild is
+ * scoped: it replaces only the chunk rows of the matching quads and leaves the
+ * rest alone. `processedQuadCount` counts every stored quad scanned.
+ *
  * When vector sync is on and no include/exclude filter narrows the rebuild,
  * the world's vectors are purged first (worlds-cloudflare#71 item 3): quads
  * removed since the last projection have no surviving D1 row to derive a
@@ -68,6 +73,7 @@ export async function rebuildD1SearchIndexFromQuads(
     dialect,
     toProjectionOptions(options),
     {
+      scope: { include: options.include, exclude: options.exclude },
       pageSize: Math.max(
         1,
         Math.floor(options.readPageSize ?? DEFAULT_D1_MATCH_PAGE_SIZE),
