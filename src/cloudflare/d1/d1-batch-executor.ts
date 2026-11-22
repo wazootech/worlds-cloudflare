@@ -4,8 +4,8 @@ import type { D1Statement } from "@/cloudflare/d1/d1-connection-driver.ts";
 /** DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE is the default IN-clause and deletion chunk width (100 params/statement cap). */
 export const DEFAULT_D1_MAX_LOOKUP_CHUNK_SIZE = 100;
 
-/** DEFAULT_D1_MAX_WRITE_BATCH_SIZE limits statements per D1 batch() call (a chosen chunk size; D1 documents no per-batch statement cap, and 100 is its bound-parameter limit per statement). */
-export const DEFAULT_D1_MAX_WRITE_BATCH_SIZE = 100;
+/** DEFAULT_D1_MAX_WRITE_BATCH_SIZE limits statements per D1 batch() call (a chosen size: Cloudflare documents no per-batch statement cap, and its own example runs a 2,000-statement batch; the 100-parameter cap is per statement and is a separate limit). */
+export const DEFAULT_D1_MAX_WRITE_BATCH_SIZE = 2000;
 
 /**
  * effectiveLookupChunkSize resolves the IN-clause chunk width for a statement

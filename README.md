@@ -53,14 +53,28 @@ from the shared behavior, each forced by the platform or kept for hosted
 consumers:
 
 - **Atomicity is bounded by one `batch()` call.** D1's atomic unit is a single
-  `batch()`. A commit with at most `maxWriteBatchSize` statements (default 100,
-  a chosen size: D1 enforces no statement cap, only 100 bound parameters per
-  statement) is one atomic batch, including its chunk rows, and a failed replace
+  `batch()`. A commit with at most `maxWriteBatchSize` statements (default
+  2,000) is one atomic batch, including its chunk rows, and a failed replace
   import keeps the old graph. A larger commit takes the core's chunked fallback:
   not atomic, a failure removes the quads written so far, and a replace import
-  that fails after its wipe leaves an empty graph. In practice an import of 50
-  or more quads exceeds the 100-statement batch and takes the chunked,
-  non-atomic fallback; raise `maxWriteBatchSize` to keep larger imports atomic.
+  that fails after its wipe leaves an empty graph. Each quad costs about two
+  statements (a quad row and a chunk row), so an import of roughly 1,000 quads
+  or more takes the chunked fallback; raise `maxWriteBatchSize` to keep larger
+  imports atomic. The 2,000 is a chosen size, not a platform cap. Cloudflare
+  documents no per-batch statement cap (read 2026-11-21,
+  <https://developers.cloudflare.com/d1/platform/limits/>): a `db.batch()`
+  "counts as a single query" against the 1000 (paid) / 50 (free) queries per
+  invocation, "a batch containing 2,000 statements executes in a single Worker
+  invocation", and the 30 second query duration "also applies to the entire
+  batch call". The 100 bound parameters per statement and the 100 KB statement
+  length are per-statement limits that still apply inside a batch (the lookup
+  chunk size stays 100). Measured on miniflare (not real D1): a 10,000-statement
+  `batch()` is accepted, and an import writes about `2 * quads + 2` statements
+  (100 quads: 202; 500: 1,010; 2,000: 4,040; 5,000: 10,100). Not documented, and
+  not verified against real D1: whether a batch much larger than 2,000, or a
+  very large total payload, is accepted. Set `maxWriteBatchSize` lower if a
+  large import nears the 30 second batch limit. The default used to be 100,
+  which sent imports of 50 or more quads down the non-atomic fallback.
 - **Vectorize is outside D1.** Vectors sync after the D1 write lands, so a
   Vectorize failure is logged drift (above), never a rollback.
 - **Deleting a quad leaves its chunk rows** until a reindex or the hosted API's

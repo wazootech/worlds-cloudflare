@@ -252,7 +252,7 @@ async function runSuite(
 
 /**
  * D1's contract. A commit that fits in one `batch()` call (the write batch
- * size, 100 statements by default) is atomic, and a failed replace import
+ * size, 2,000 statements by default) is atomic, and a failed replace import
  * keeps the old graph. A larger commit takes the shared core's chunked
  * fallback, which is not atomic and leaves an empty graph if a replace import
  * fails after its wipe. Embedding failures throw; imports default to "incremental".

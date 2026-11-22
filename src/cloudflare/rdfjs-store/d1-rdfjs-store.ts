@@ -56,7 +56,7 @@ export interface D1RdfjsStoreOptions {
   /** matchPageSize limits rows per match SQL round-trip (default 1000). */
   matchPageSize?: number;
 
-  /** maxWriteBatchSize caps statements per D1 batch() call (default 500). */
+  /** maxWriteBatchSize caps statements per D1 batch() call (default 2000). */
   maxWriteBatchSize?: number;
 
   /** maxLookupChunkSize caps IN-clause / deletion chunk width (default 100). */

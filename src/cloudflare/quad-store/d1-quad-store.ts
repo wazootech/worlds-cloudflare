@@ -35,7 +35,7 @@ export interface D1QuadStoreOptions extends D1ClientBaseOptions {
   /** searchIndexProjector manages text chunk synchronisation. */
   searchIndexProjector?: D1SearchIndexProjector;
 
-  /** maxWriteBatchSize caps how many statements are sent per D1 write batch, and so how large a commit can be and still be atomic. Defaults to 100. */
+  /** maxWriteBatchSize caps how many statements are sent per D1 write batch, and so how large a commit can be and still be atomic. Defaults to 2000. */
   maxWriteBatchSize?: number;
 
   /** worldId scopes all quad and search-index operations. */
