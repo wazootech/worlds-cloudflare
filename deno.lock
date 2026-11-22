@@ -10,8 +10,8 @@
     "jsr:@wazoo/sparql-engine@0.4.4": "0.4.4",
     "jsr:@wazoo/sparql-engine@0.5": "0.5.0",
     "jsr:@worlds/client@0.1": "0.1.0",
-    "jsr:@worlds/sdk@~0.9.1": "0.9.1",
-    "jsr:@worlds/sqlite@~0.7.4": "0.7.4",
+    "jsr:@worlds/sdk@0.10": "0.10.0",
+    "jsr:@worlds/sqlite@0.8": "0.8.0",
     "npm:@langchain/textsplitters@^1.0.1": "1.0.2_@langchain+core@1.4.2",
     "npm:@rdfjs/types@^2.0.1": "2.0.1",
     "npm:@tensorflow/tfjs-backend-wasm@^4.22.0": "4.22.0_@tensorflow+tfjs-core@4.22.0",
@@ -66,8 +66,8 @@
     "@worlds/client@0.1.0": {
       "integrity": "0f55a9cdeb6316417233129e9fa000c92d79739b7317a8e1a33704cf2bb2b458"
     },
-    "@worlds/sdk@0.9.1": {
-      "integrity": "533a1787a2aaebf6746ae12bbb49840c67f5db86f1c80b32f5c3447bb47470ba",
+    "@worlds/sdk@0.10.0": {
+      "integrity": "8b4536cb7052a7be91dea1947ead6de5e89197759ca82a6142da049bc27d7b74",
       "dependencies": [
         "jsr:@std/encoding",
         "jsr:@std/path",
@@ -81,8 +81,8 @@
         "npm:n3"
       ]
     },
-    "@worlds/sqlite@0.7.4": {
-      "integrity": "95ccb544ec21468ac552c2a391e0993909596906a2cbb1afd486a13a40587cfe",
+    "@worlds/sqlite@0.8.0": {
+      "integrity": "89090d5b12bc2f3b929b39f50707c1cd71643309c3b6e12874bd16011d9ea976",
       "dependencies": [
         "jsr:@wazoo/sparql-engine@0.5",
         "jsr:@worlds/sdk",
@@ -1021,8 +1021,8 @@
       "jsr:@std/assert@^1.0.19",
       "jsr:@wazoo/reasoner@~0.4.1",
       "jsr:@wazoo/sparql-engine@0.5",
-      "jsr:@worlds/sdk@~0.9.1",
-      "jsr:@worlds/sqlite@~0.7.4",
+      "jsr:@worlds/sdk@0.10",
+      "jsr:@worlds/sqlite@0.8",
       "npm:@langchain/textsplitters@^1.0.1",
       "npm:@rdfjs/types@^2.0.1",
       "npm:miniflare@^4.20260730.0"
