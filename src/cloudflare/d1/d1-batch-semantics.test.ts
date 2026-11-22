@@ -4,7 +4,7 @@ import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 /**
  * What a D1 `batch()` call guarantees, checked against miniflare's D1. The
  * shared commit contract relies on it: the batch is the atomic unit, and the
- * 2,000 in `DEFAULT_D1_MAX_WRITE_BATCH_SIZE` is a chosen size, not a limit
+ * 750 in `DEFAULT_D1_MAX_WRITE_BATCH_SIZE` is a chosen size, not a limit
  * D1 documents on statements per batch (Cloudflare's 100 limit is bound
  * parameters per statement, a separate cap).
  */

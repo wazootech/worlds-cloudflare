@@ -53,28 +53,75 @@ from the shared behavior, each forced by the platform or kept for hosted
 consumers:
 
 - **Atomicity is bounded by one `batch()` call.** D1's atomic unit is a single
-  `batch()`. A commit with at most `maxWriteBatchSize` statements (default
-  2,000) is one atomic batch, including its chunk rows, and a failed replace
-  import keeps the old graph. A larger commit takes the core's chunked fallback:
-  not atomic, a failure removes the quads written so far, and a replace import
-  that fails after its wipe leaves an empty graph. Each quad costs about two
-  statements (a quad row and a chunk row), so an import of roughly 1,000 quads
-  or more takes the chunked fallback; raise `maxWriteBatchSize` to keep larger
-  imports atomic. The 2,000 is a chosen size, not a platform cap. Cloudflare
-  documents no per-batch statement cap (read 2026-11-21,
+  `batch()`. A commit with at most `maxWriteBatchSize` statements (default 750)
+  is one atomic batch, including its chunk rows, and a failed replace import
+  keeps the old graph. A larger commit takes the core's chunked fallback: not
+  atomic, a failure removes the quads written so far, and a replace import that
+  fails after its wipe leaves an empty graph. Each quad costs about two
+  statements (a quad row and a chunk row), so an import of roughly 375 quads or
+  more takes the chunked fallback; raise `maxWriteBatchSize` to keep larger
+  imports atomic, mindful of the payload limit below. The default used to be
+  100, which sent imports of 50 or more quads down the non-atomic fallback.
+  Cloudflare documents no per-batch statement cap (read 2026-11-22,
   <https://developers.cloudflare.com/d1/platform/limits/>): a `db.batch()`
   "counts as a single query" against the 1000 (paid) / 50 (free) queries per
-  invocation, "a batch containing 2,000 statements executes in a single Worker
-  invocation", and the 30 second query duration "also applies to the entire
-  batch call". The 100 bound parameters per statement and the 100 KB statement
-  length are per-statement limits that still apply inside a batch (the lookup
-  chunk size stays 100). Measured on miniflare (not real D1): a 10,000-statement
-  `batch()` is accepted, and an import writes about `2 * quads + 2` statements
-  (100 quads: 202; 500: 1,010; 2,000: 4,040; 5,000: 10,100). Not documented, and
-  not verified against real D1: whether a batch much larger than 2,000, or a
-  very large total payload, is accepted. Set `maxWriteBatchSize` lower if a
-  large import nears the 30 second batch limit. The default used to be 100,
-  which sent imports of 50 or more quads down the non-atomic fallback.
+  invocation, the 30 second query duration "also applies to the entire batch
+  call", and the 100 bound parameters and 100,000 byte statement length are
+  per-statement limits that still apply inside a batch (the lookup chunk size
+  stays 100). The binding has one more limit, found by measurement: **the
+  Worker-to-D1 RPC rejects a `batch()` whose serialized arguments exceed 32
+  MiB**
+  (`D1_ERROR: Serialized RPC arguments or return values are limited to
+  32MiB`).
+  It is a byte limit, so the safe statement count depends on row size.
+  - **Measured on a real D1 throwaway database, 2026-11-22** (Worker binding,
+    `wrangler dev --remote`, the repo's `quads`/`chunks` schema with the 7 quad
+    indexes, the chunk index, the FTS5 table and its triggers; one run each, so
+    timings are indicative, not statistical). "Mixed" alternates a quad row and
+    a chunk row, as an import does; "chunks" is chunk rows only (a reindex).
+    Chunk rows carry a float32 BLOB vector and about 200 characters of text.
+
+    | statements | row kind                  | payload (raw) | wall ms (Worker) | result                                |
+    | ---------- | ------------------------- | ------------- | ---------------- | ------------------------------------- |
+    | 100        | mixed, 384-dim            | 0.11 MB       | 99 (87 on rerun) | ok                                    |
+    | 500        | mixed, 384-dim            | 0.57 MB       | 268              | ok                                    |
+    | 1,000      | mixed, 384-dim            | 1.1 MB        | 387              | ok                                    |
+    | 2,000      | mixed, 384-dim            | 2.3 MB        | 710              | ok                                    |
+    | 4,000      | mixed, 384-dim            | 4.6 MB        | 1,411            | ok                                    |
+    | 2,000      | chunks, 384-dim           | 4.0 MB        | 1,034            | ok                                    |
+    | 3,000      | chunks, 384-dim           | 6.0 MB        | 2,044            | ok                                    |
+    | 4,000      | chunks, 384-dim           | 8.0 MB        | 3,243            | ok                                    |
+    | 100        | mixed, 1,536-dim          | 0.34 MB       | 121              | ok                                    |
+    | 500        | mixed, 1,536-dim          | 1.7 MB        | 391              | ok                                    |
+    | 1,000      | mixed, 1,536-dim          | 3.4 MB        | 870              | ok                                    |
+    | 2,000      | mixed, 1,536-dim          | 6.9 MB        | 1,425            | ok (about 22.7 MB serialized)         |
+    | 4,000      | mixed, 1,536-dim          | 13.8 MB       | n/a              | rejected, 45.3 MB serialized > 32 MiB |
+    | 1,000      | chunks, 1,536-dim         | 6.6 MB        | 1,511            | ok                                    |
+    | 1,400      | chunks, 1,536-dim         | 9.2 MB        | 1,707            | ok                                    |
+    | 1,500      | chunks, 1,536-dim         | 9.9 MB        | 2,584            | ok                                    |
+    | 1,510      | chunks, 1,536-dim         | 10.0 MB       | n/a              | rejected, 33.6 MB serialized > 32 MiB |
+    | 2,000      | chunks, 1,536-dim (heavy) | 13.2 MB       | n/a              | rejected, 44.5 MB serialized > 32 MiB |
+
+    A 1,536-dim chunk row serializes to about 22 KB (3.6x its raw BLOB bytes),
+    so pure heavy-chunk batches top out near 1,500 statements. At 750 the heavy
+    worst case is about 16.7 MB serialized, 2x under the limit; a mixed import
+    of 1,536-dim rows is about 3.8x under. Time was never the constraint: every
+    accepted batch finished in under 3 s against the documented 30 s, and D1
+    reported under 0.6 s of summed SQL time for every batch up to 2,000
+    statements (1.7 s at 4,000 chunk rows). **Atomic rollback** was verified on
+    real D1: a batch whose last statement duplicated an earlier primary key
+    (after 500, then 2,000 statements, 384-dim and 1,536-dim) failed with
+    `UNIQUE constraint failed` and left zero rows in `quads` and `chunks`; a
+    last statement against a missing table did the same (rejected before any row
+    was written).
+  - **Not measured:** concurrent writers or load, production latency under
+    realistic contention (this was an idle new database from one location,
+    WNAM), batches above 4,000 statements of 384-dim rows (the 32 MiB bound
+    suggests about 6,000 chunk rows of 384 dimensions), chunk text far longer
+    than 200 characters (a larger `value`/`fts_value` shrinks the safe count),
+    and databases with large existing tables. Production batch timing and the
+    `Too many API requests by single Worker invocation` limit were not
+    exercised.
 - **Vectorize is outside D1.** Vectors sync after the D1 write lands, so a
   Vectorize failure is logged drift (above), never a rollback.
 - **Deleting a quad leaves its chunk rows** until a reindex or the hosted API's

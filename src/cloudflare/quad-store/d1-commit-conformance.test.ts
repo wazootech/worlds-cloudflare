@@ -252,15 +252,15 @@ async function runSuite(
 
 /**
  * D1's contract. A commit that fits in one `batch()` call (the write batch
- * size, 2,000 statements by default) is atomic, and a failed replace import
+ * size, 750 statements by default) is atomic, and a failed replace import
  * keeps the old graph. A larger commit takes the shared core's chunked
  * fallback, which is not atomic and leaves an empty graph if a replace import
  * fails after its wipe. Embedding failures throw; imports default to "incremental".
  *
- * Not verified against real D1: the atomic claim rests on miniflare's D1, whose
- * `batch()` rolls the whole batch back when one statement fails, and on D1's
- * documented batch semantics. Nothing here has run against a deployed D1. The
- * `failLaterWrite` case exercises it: the failing statement is a chunk-row
+ * This suite runs on miniflare's D1. Real D1 was probed once (2026-11-22, a
+ * throwaway database, see README): a 2,000-statement `batch()` whose last
+ * statement violated a primary key left zero rows, so the atomic claim holds
+ * there too. The `failLaterWrite` case exercises it here: the failing statement is a chunk-row
  * insert that comes after the quad inserts in the same batch.
  */
 Deno.test("D1 satisfies the shared commit conformance suite on the atomic path", async () => {

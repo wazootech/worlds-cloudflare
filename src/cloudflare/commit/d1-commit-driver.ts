@@ -30,7 +30,7 @@ export interface D1CommitDriverOptions extends QuadFilter {
   /** maxLookupChunkSize caps host parameters per IN clause (default 100). */
   maxLookupChunkSize?: number;
 
-  /** maxWriteBatchSize is both the atomic limit and the fallback batch size (default 2000). */
+  /** maxWriteBatchSize is both the atomic limit and the fallback batch size (default 750). */
   maxWriteBatchSize?: number;
 
   /** beforePage runs on each page of a rebuild before it is chunked and written. */

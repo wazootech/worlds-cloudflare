@@ -51,7 +51,7 @@ export interface D1ClientBaseOptions extends QuadFilter {
    */
   matchPageSize?: number;
 
-  /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 2000, a chosen size: Cloudflare documents no per-batch statement cap and its own example runs a 2,000-statement batch (the 100 limit is bound parameters per statement, a separate cap). */
+  /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 750, a size chosen from a real-D1 measurement (Cloudflare documents no per-batch statement cap, but the Worker-to-D1 RPC rejects batches over 32 MiB serialized; the 100 limit is bound parameters per statement, a separate cap). */
   maxWriteBatchSize?: number;
 
   /**
