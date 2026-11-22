@@ -49,7 +49,7 @@ function chunked(
  * delete in that call precedes the derived writes, as inference requires.
  *
  * `buildDeletions` removes quad rows only. A deleted quad's chunk rows stay
- * until a reindex or the hosted API's orphan cleanup: they are the only record
+ * until an unscoped reindex or the hosted API's orphan cleanup: they are the only record
  * of the vector ids to remove from the outside-D1 vector index.
  */
 export function createD1CommitDialect(
@@ -80,9 +80,10 @@ export function createD1CommitDialect(
   return {
     keyOf: (_quad, hash) => hash,
     buildWipe: () => buildWipeAllGraphDataStatements(worldId),
-    // Chunk rows are replaced per quad (see buildChunkRows), so a rebuild
-    // needs no wipe; chunk rows of deleted quads are left to the orphan cleanup.
-    buildClearChunks: () => [],
+    // An unscoped rebuild clears the world's chunk rows, which also drops the
+    // rows of deleted quads; a scoped one replaces only its quads' rows.
+    buildClearChunks: () => [searchQueryBuilder.buildClearChunks()],
+    buildDeleteChunks: deleteChunks,
     buildDeletions: (keys) => [
       ...chunked(
         keys,
