@@ -40,6 +40,9 @@ function tag(inner: D1PreparedStatementLike, sql: string): TaggedStatement {
   };
 }
 
+/** CHUNK_INSERT starts the statement that writes a search chunk row. */
+const CHUNK_INSERT = "INSERT INTO chunks";
+
 /** FailingD1 is a D1 binding whose write batches can be made to fail once. */
 export interface FailingD1 {
   database: D1DatabaseLike;
@@ -49,7 +52,29 @@ export interface FailingD1 {
 
   /** failWriteAfter makes the write batch after `skip` more write batches fail once. A replace wipe never counts. */
   failWriteAfter(skip: number): void;
+
+  /**
+   * failLaterWrite arms one failure on the first chunk-row insert that a write
+   * batch carries. Quad inserts that come earlier (in the same batch, or in an
+   * earlier batch) still run first; see `laterFailure`.
+   */
+  failLaterWrite(): void;
+
+  /** laterFailure is where the armed later-write failure landed, once it has fired. */
+  laterFailure(): LaterFailure | undefined;
 }
+
+/**
+ * LaterFailure records the statements written since `failLaterWrite` was armed,
+ * in order, and the index of the poisoned chunk-row insert among them.
+ */
+export interface LaterFailure {
+  statements: string[];
+  failedAt: number;
+}
+
+/** POISON is a chunk-row insert that D1 rejects (an unknown column) when it executes. */
+const POISON = "INSERT INTO chunks (no_such_column) VALUES (1)";
 
 /**
  * failingD1 wraps a D1 binding. Reads (`prepare().all()`) always work; a
@@ -60,8 +85,17 @@ export interface FailingD1 {
 export function failingD1(database: D1DatabaseLike): FailingD1 {
   let skip: number | undefined;
   let rebuilds = 0;
+  let armedLater = false;
+  let written: string[] = [];
+  let later: LaterFailure | undefined;
   return {
     fullRebuilds: () => rebuilds,
+    failLaterWrite: () => {
+      armedLater = true;
+      written = [];
+      later = undefined;
+    },
+    laterFailure: () => later,
     failWriteAfter: (count) => {
       skip = count;
     },
@@ -85,6 +119,25 @@ export function failingD1(database: D1DatabaseLike): FailingD1 {
           }
           skip--;
         }
+        if (armedLater) {
+          const at = tagged.findIndex((s) => s.sql.startsWith(CHUNK_INSERT));
+          if (at < 0) written.push(...tagged.map((s) => s.sql));
+          else {
+            // Run the real batch with the chunk-row insert swapped for one
+            // that fails when it executes, so every statement before it has
+            // already run when D1 rejects the batch.
+            armedLater = false;
+            later = {
+              statements: [...written, ...tagged.map((s) => s.sql)],
+              failedAt: written.length + at,
+            };
+            return database.batch(
+              tagged.map((s, i) =>
+                i === at ? database.prepare(POISON) : s.inner
+              ),
+            );
+          }
+        }
         return database.batch(tagged.map((s) => s.inner));
       },
     },
@@ -94,6 +147,8 @@ export function failingD1(database: D1DatabaseLike): FailingD1 {
 /** D1TestSubject is the conformance subject plus its teardown and failure hook. */
 export interface D1TestSubject extends CommitConformanceSubject {
   failWriteAfter(skip: number): void;
+  failLaterWrite(): void;
+  laterFailure(): LaterFailure | undefined;
   dispose(): Promise<void>;
 }
 
@@ -146,6 +201,8 @@ export async function createD1Subject(
     },
     failNextWrite: () => failing.failWriteAfter(0),
     failWriteAfter: (skip) => failing.failWriteAfter(skip),
+    failLaterWrite: () => failing.failLaterWrite(),
+    laterFailure: () => failing.laterFailure(),
     fullRebuildCount: () => failing.fullRebuilds() - readerPages,
     dispose: substrate.dispose,
   };
@@ -177,6 +234,17 @@ async function runSuite(
     });
     const failed = report.results.filter((r) => !r.ok);
     assert(report.ok, `conformance failures: ${JSON.stringify(failed)}`);
+    // A skipped case is not a pass: the later-write case must actually run.
+    assertEquals(
+      (report.notes ?? []).filter((note) => note.includes("later-write")),
+      [],
+    );
+    assert(
+      report.results.some((r) =>
+        r.name === "later-write failure follows the contract" && r.ok
+      ),
+      "the later-write case must run and pass",
+    );
   } finally {
     await disposeAll();
   }
@@ -188,6 +256,12 @@ async function runSuite(
  * keeps the old graph. A larger commit takes the shared core's chunked
  * fallback, which is not atomic and leaves an empty graph if a replace import
  * fails after its wipe. Embedding failures throw; imports default to "incremental".
+ *
+ * Not verified against real D1: the atomic claim rests on miniflare's D1, whose
+ * `batch()` rolls the whole batch back when one statement fails, and on D1's
+ * documented batch semantics. Nothing here has run against a deployed D1. The
+ * `failLaterWrite` case exercises it: the failing statement is a chunk-row
+ * insert that comes after the quad inserts in the same batch.
  */
 Deno.test("D1 satisfies the shared commit conformance suite on the atomic path", async () => {
   await runSuite(undefined, {
@@ -195,6 +269,7 @@ Deno.test("D1 satisfies the shared commit conformance suite on the atomic path",
     embeddingFailure: "throws",
     replaceImportFailure: "keeps-old-graph",
     defaultSearchIndexOnImport: "incremental",
+    laterWriteFailure: "restores-prior-state",
   });
 });
 
@@ -205,6 +280,8 @@ Deno.test("D1 satisfies the shared commit conformance suite on the chunked fallb
     embeddingFailure: "throws",
     replaceImportFailure: "empties-graph",
     defaultSearchIndexOnImport: "incremental",
+    // The compensating cleanup removes the quads that earlier batches wrote.
+    laterWriteFailure: "restores-prior-state",
   });
 });
 
@@ -240,3 +317,42 @@ Deno.test("a failed write after the first batch removes the novel quads and thei
     await subject.dispose();
   }
 });
+
+for (
+  const [name, size] of [["atomic batch", undefined], [
+    "chunked batches",
+    1,
+  ]] as const
+) {
+  Deno.test(`the later-write failure follows the quad writes (${name})`, async () => {
+    const subject = await createD1Subject({
+      searchIndexOnImport: "incremental",
+      embeddingService: new FakeEmbeddingService(),
+      maxWriteBatchSize: size,
+    });
+    try {
+      subject.failLaterWrite();
+      await assertRejects(() =>
+        subject.commit({ insertions: [one, two], deletions: [] })
+      );
+      const failure = subject.laterFailure();
+      assert(failure, "the armed failure must fire");
+      const quadWrites = failure.statements.map((sql, index) => ({
+        sql,
+        index,
+      }))
+        .filter(({ sql }) => sql.includes(" INTO quads "));
+      assert(quadWrites.length > 0, "the commit must write quads");
+      assert(
+        quadWrites.every(({ index }) => index < failure.failedAt),
+        `every quad insert must precede the failing write: ${
+          JSON.stringify(failure)
+        }`,
+      );
+      assertEquals(await subject.storedQuads(), []);
+      assertEquals(await subject.chunkedQuadIds(), []);
+    } finally {
+      await subject.dispose();
+    }
+  });
+}
