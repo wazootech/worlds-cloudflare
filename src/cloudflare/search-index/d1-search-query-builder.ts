@@ -87,6 +87,13 @@ export class D1SearchQueryBuilder {
     };
   }
 
+  /** buildClearChunks removes every chunk row of this builder's world (all rows without one). */
+  public buildClearChunks(): SqlStatement {
+    return this.worldId
+      ? { sql: "DELETE FROM chunks WHERE world_id = ?", args: [this.worldId] }
+      : { sql: "DELETE FROM chunks", args: [] };
+  }
+
   public buildDeleteByQuadIds(
     quadIds: string[],
   ): SqlStatement {
