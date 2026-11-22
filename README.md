@@ -58,7 +58,9 @@ consumers:
   statement) is one atomic batch, including its chunk rows, and a failed replace
   import keeps the old graph. A larger commit takes the core's chunked fallback:
   not atomic, a failure removes the quads written so far, and a replace import
-  that fails after its wipe leaves an empty graph.
+  that fails after its wipe leaves an empty graph. In practice an import of 50
+  or more quads exceeds the 100-statement batch and takes the chunked,
+  non-atomic fallback; raise `maxWriteBatchSize` to keep larger imports atomic.
 - **Vectorize is outside D1.** Vectors sync after the D1 write lands, so a
   Vectorize failure is logged drift (above), never a rollback.
 - **Deleting a quad leaves its chunk rows** until a reindex or the hosted API's
