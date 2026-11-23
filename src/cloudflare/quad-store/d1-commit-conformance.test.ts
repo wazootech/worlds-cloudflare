@@ -154,7 +154,10 @@ export interface D1TestSubject extends CommitConformanceSubject {
 
 /** createD1Subject wires a miniflare D1 world with chunk and vector projection. */
 export async function createD1Subject(
-  options: CommitConformanceCreateOptions & { maxWriteBatchSize?: number },
+  options: CommitConformanceCreateOptions & {
+    maxWriteBatchSize?: number;
+    maxBatchWeight?: number;
+  },
 ): Promise<D1TestSubject> {
   const substrate = await createTestD1();
   const failing = failingD1(substrate.database);
@@ -178,6 +181,7 @@ export async function createD1Subject(
     searchIndexProjector: projector,
     searchIndexOnImport: options.searchIndexOnImport,
     maxWriteBatchSize: options.maxWriteBatchSize,
+    maxBatchWeight: options.maxBatchWeight,
   });
   return {
     commit: async (patch: Patch, context?: TransactionContext) => {
@@ -210,10 +214,14 @@ export async function createD1Subject(
 
 const disposers: Array<() => Promise<void>> = [];
 
-/** createWith returns a subject factory whose commits batch at most `maxWriteBatchSize` statements. */
-function createWith(maxWriteBatchSize?: number) {
+/** createWith returns a subject factory whose commits batch within `maxWriteBatchSize` statements and `maxBatchWeight` estimated bytes. */
+function createWith(maxWriteBatchSize?: number, maxBatchWeight?: number) {
   return async (options: CommitConformanceCreateOptions) => {
-    const subject = await createD1Subject({ ...options, maxWriteBatchSize });
+    const subject = await createD1Subject({
+      ...options,
+      maxWriteBatchSize,
+      maxBatchWeight,
+    });
     disposers.push(subject.dispose);
     return subject;
   };
@@ -226,10 +234,11 @@ async function disposeAll() {
 async function runSuite(
   maxWriteBatchSize: number | undefined,
   contract: CommitConformanceContract,
+  maxBatchWeight?: number,
 ) {
   try {
     const report = await runCommitConformanceSuite({
-      create: createWith(maxWriteBatchSize),
+      create: createWith(maxWriteBatchSize, maxBatchWeight),
       contract,
     });
     const failed = report.results.filter((r) => !r.ok);
@@ -252,7 +261,7 @@ async function runSuite(
 
 /**
  * D1's contract. A commit that fits in one `batch()` call (the write batch
- * size, 750 statements by default) is atomic, and a failed replace import
+ * size and byte budget, 2,000 statements and 16 MiB by default) is atomic, and a failed replace import
  * keeps the old graph. A larger commit takes the shared core's chunked
  * fallback, which is not atomic and leaves an empty graph if a replace import
  * fails after its wipe. Embedding failures throw; imports default to "incremental".
@@ -283,6 +292,17 @@ Deno.test("D1 satisfies the shared commit conformance suite on the chunked fallb
     // The compensating cleanup removes the quads that earlier batches wrote.
     laterWriteFailure: "restores-prior-state",
   });
+});
+
+Deno.test("D1 satisfies the shared commit conformance suite on the byte-budget chunked path", async () => {
+  // A 1-byte budget puts every statement alone in its own batch.
+  await runSuite(undefined, {
+    atomic: false,
+    embeddingFailure: "throws",
+    replaceImportFailure: "empties-graph",
+    defaultSearchIndexOnImport: "incremental",
+    laterWriteFailure: "restores-prior-state",
+  }, 1);
 });
 
 const { namedNode, literal, quad } = DataFactory;
@@ -319,16 +339,18 @@ Deno.test("a failed write after the first batch removes the novel quads and thei
 });
 
 for (
-  const [name, size] of [["atomic batch", undefined], [
-    "chunked batches",
-    1,
-  ]] as const
+  const [name, size, weight] of [
+    ["atomic batch", undefined, undefined],
+    ["chunked batches", 1, undefined],
+    ["byte-budget batches", undefined, 1],
+  ] as const
 ) {
   Deno.test(`the later-write failure follows the quad writes (${name})`, async () => {
     const subject = await createD1Subject({
       searchIndexOnImport: "incremental",
       embeddingService: new FakeEmbeddingService(),
       maxWriteBatchSize: size,
+      maxBatchWeight: weight,
     });
     try {
       subject.failLaterWrite();

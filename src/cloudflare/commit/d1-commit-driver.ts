@@ -9,6 +9,10 @@ import {
   DEFAULT_D1_MAX_WRITE_BATCH_SIZE,
   effectiveLookupChunkSize,
 } from "@/cloudflare/d1/d1-batch-executor.ts";
+import {
+  d1StatementWeight,
+  DEFAULT_D1_MAX_BATCH_WEIGHT,
+} from "@/cloudflare/d1/d1-statement-weight.ts";
 import { quadFromD1Row } from "@/cloudflare/d1/d1-quad-row.ts";
 import {
   buildMatchQuadsQuery,
@@ -30,8 +34,15 @@ export interface D1CommitDriverOptions extends QuadFilter {
   /** maxLookupChunkSize caps host parameters per IN clause (default 100). */
   maxLookupChunkSize?: number;
 
-  /** maxWriteBatchSize is both the atomic limit and the fallback batch size (default 750). */
+  /** maxWriteBatchSize is both the atomic statement limit and the fallback batch size (default 2,000). */
   maxWriteBatchSize?: number;
+
+  /**
+   * maxBatchWeight is the estimated serialized bytes one batch may carry, on top
+   * of the count limit (default 16 MiB, 2x under the measured 32 MiB RPC limit).
+   * A commit is atomic only if it fits both.
+   */
+  maxBatchWeight?: number;
 
   /** beforePage runs on each page of a rebuild before it is chunked and written. */
   beforePage?: (quads: rdfjs.Quad[]) => Promise<void>;
@@ -46,7 +57,8 @@ export interface D1CommitDriver extends SqlCommitDriver<D1Statement> {
 /**
  * createD1CommitDriver adapts a D1 connection to the shared core's driver. D1's
  * atomic unit is one `batch()` call. Cloudflare documents no statement cap for
- * it, so the atomic limit is the chosen write batch size: a commit that fits
+ * it, so the atomic limit is the chosen write batch size plus a byte budget
+ * (the binding rejects a batch over 32 MiB serialized): a commit that fits both
  * is atomic, a larger one takes the core's chunked fallback with cleanup.
  */
 export function createD1CommitDriver(
@@ -63,6 +75,8 @@ export function createD1CommitDriver(
   const driver: D1CommitDriver = {
     maxAtomicStatements: batchSize,
     writeBatchSize: batchSize,
+    statementWeight: d1StatementWeight,
+    maxBatchWeight: options.maxBatchWeight ?? DEFAULT_D1_MAX_BATCH_WEIGHT,
     processedQuadCount: 0,
     executeBatch: (statements) => connection.batch(statements),
     async lookupExisting(keys) {

@@ -53,16 +53,23 @@ from the shared behavior, each forced by the platform or kept for hosted
 consumers:
 
 - **Atomicity is bounded by one `batch()` call.** D1's atomic unit is a single
-  `batch()`. A commit with at most `maxWriteBatchSize` statements (default 750)
-  is one atomic batch, including its chunk rows, and a failed replace import
-  keeps the old graph. A larger commit takes the core's chunked fallback: not
-  atomic, a failure removes the quads written so far, and a replace import that
-  fails after its wipe leaves an empty graph. Each quad costs about two
-  statements (a quad row and a chunk row), so an import of roughly 375 quads or
-  more takes the chunked fallback; raise `maxWriteBatchSize` to keep larger
-  imports atomic, mindful of the payload limit below. The default used to be
-  100, which sent imports of 50 or more quads down the non-atomic fallback.
-  Cloudflare documents no per-batch statement cap (read 2026-11-22,
+  `batch()`. A commit that fits in one batch under both limits, at most
+  `maxWriteBatchSize` statements (default 2,000) and at most `maxBatchWeight`
+  estimated serialized bytes (default 16 MiB, `DEFAULT_D1_MAX_BATCH_WEIGHT`), is
+  one atomic batch, including its chunk rows, and a failed replace import keeps
+  the old graph. A larger commit takes the core's chunked fallback, which fills
+  each batch up to both limits: not atomic, a failure removes the quads written
+  so far, and a replace import that fails after its wipe leaves an empty graph.
+  Each quad costs about two statements (a quad row and a chunk row). By the
+  estimate below, an import stays atomic up to about 1,000 quads with 384-dim
+  vectors (the count limit binds) and about 640 quads with 1,536-dim vectors
+  (the byte budget binds); beyond that it takes the chunked fallback. Raise or
+  lower either limit through the `maxWriteBatchSize` and `maxBatchWeight`
+  options, mindful of the payload limit below. The default was 100 before the
+  first real-D1 measurement (imports of 50 or more quads took the non-atomic
+  fallback) and 750 in an unreleased build; this release replaces it with the
+  2,000 count plus the byte guard. Cloudflare documents no per-batch statement
+  cap (read 2026-11-22,
   <https://developers.cloudflare.com/d1/platform/limits/>): a `db.batch()`
   "counts as a single query" against the 1000 (paid) / 50 (free) queries per
   invocation, the 30 second query duration "also applies to the entire batch
@@ -103,23 +110,40 @@ consumers:
     | 2,000      | chunks, 1,536-dim (heavy) | 13.2 MB       | n/a              | rejected, 44.5 MB serialized > 32 MiB |
 
     A 1,536-dim chunk row serializes to about 22 KB (3.6x its raw BLOB bytes),
-    so pure heavy-chunk batches top out near 1,500 statements. At 750 the heavy
-    worst case is about 16.7 MB serialized, 2x under the limit; a mixed import
-    of 1,536-dim rows is about 3.8x under. Time was never the constraint: every
-    accepted batch finished in under 3 s against the documented 30 s, and D1
-    reported under 0.6 s of summed SQL time for every batch up to 2,000
-    statements (1.7 s at 4,000 chunk rows). **Atomic rollback** was verified on
-    real D1: a batch whose last statement duplicated an earlier primary key
-    (after 500, then 2,000 statements, 384-dim and 1,536-dim) failed with
-    `UNIQUE constraint failed` and left zero rows in `quads` and `chunks`; a
-    last statement against a missing table did the same (rejected before any row
-    was written).
-  - **Not measured:** concurrent writers or load, production latency under
-    realistic contention (this was an idle new database from one location,
-    WNAM), batches above 4,000 statements of 384-dim rows (the 32 MiB bound
-    suggests about 6,000 chunk rows of 384 dimensions), chunk text far longer
-    than 200 characters (a larger `value`/`fts_value` shrinks the safe count),
-    and databases with large existing tables. Production batch timing and the
+    so pure heavy-chunk batches top out near 1,500 statements, while 2,000
+    statements were accepted at every other measured shape. Time was never the
+    constraint: every accepted batch finished in under 3 s against the
+    documented 30 s, and D1 reported under 0.6 s of summed SQL time for every
+    batch up to 2,000 statements (1.7 s at 4,000 chunk rows). **Atomic
+    rollback** was verified on real D1: a batch whose last statement duplicated
+    an earlier primary key (after 500, then 2,000 statements, 384-dim and
+    1,536-dim) failed with `UNIQUE constraint failed` and left zero rows in
+    `quads` and `chunks`; a last statement against a missing table did the same
+    (rejected before any row was written).
+  - **The byte estimate is an ESTIMATE, calibrated from those points.** The
+    commit driver weighs each statement as its SQL text length, 64 bytes of
+    overhead, and its bound parameters: strings by UTF-16 code units, BLOBs (the
+    float32 vector) at 4 bytes per raw byte (measured about 3.6, rounded up to
+    err high), numbers, booleans and null at 8 bytes. It puts a 1,536-dim chunk
+    row near 25 KB, a 768-dim one near 13 KB and a 384-dim one near 7 KB, so
+    2,000 heavy chunk rows estimate well over 16 MiB and 2,000 mixed 384-dim
+    rows do not. The unit tests check that the estimate is not below the
+    serialized sizes measured above, using the repo's own statement builders; no
+    real D1 call checked the estimator itself. The 16 MiB budget leaves 2x
+    headroom under 32 MiB for its error. Both are exported and overridable
+    (`d1StatementWeight`, `DEFAULT_D1_MAX_BATCH_WEIGHT`, the `maxBatchWeight`
+    option).
+  - **This change was not re-verified on a real D1.** The measurements above
+    predate the byte budget; the budget, the 2,000 default and the estimator are
+    tested on miniflare and with fakes only, and miniflare enforces no 32 MiB
+    limit.
+  - **Not measured:** the estimator and the 16 MiB budget on a real D1 after
+    this change, concurrent writers or load, production latency under realistic
+    contention (this was an idle new database from one location, WNAM), batches
+    above 4,000 statements of 384-dim rows (the 32 MiB bound suggests about
+    6,000 chunk rows of 384 dimensions), chunk text far longer than 200
+    characters (a larger `value`/`fts_value` shrinks the safe count), and
+    databases with large existing tables. Production batch timing and the
     `Too many API requests by single Worker invocation` limit were not
     exercised.
 - **Vectorize is outside D1.** Vectors sync after the D1 write lands, so a
