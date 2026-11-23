@@ -51,8 +51,11 @@ export interface D1ClientBaseOptions extends QuadFilter {
    */
   matchPageSize?: number;
 
-  /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 750, a size chosen from a real-D1 measurement (Cloudflare documents no per-batch statement cap, but the Worker-to-D1 RPC rejects batches over 32 MiB serialized; the 100 limit is bound parameters per statement, a separate cap). */
+  /** maxWriteBatchSize caps how many statements are sent per D1 batch, and so how many a commit may hold and still be atomic. Defaults to 2,000, the largest count measured fine on a real D1 at every vector dimension (Cloudflare documents no per-batch statement cap; the 100 limit is bound parameters per statement, a separate cap). */
   maxWriteBatchSize?: number;
+
+  /** maxBatchWeight caps the estimated serialized bytes per D1 batch (default 16 MiB, 2x under the 32 MiB Worker-to-D1 RPC limit measured on a real D1). A commit is atomic only if it fits this and `maxWriteBatchSize`; heavy rows (1,536-dim vectors) hit this first. */
+  maxBatchWeight?: number;
 
   /**
    * searchIndexOnImport controls when FTS/vector chunk projection runs during import.

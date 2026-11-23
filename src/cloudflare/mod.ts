@@ -18,6 +18,11 @@ export type {
   D1Result,
   D1Statement,
 } from "./d1/d1-connection-driver.ts";
+export {
+  d1StatementWeight,
+  DEFAULT_D1_MAX_BATCH_WEIGHT,
+} from "./d1/d1-statement-weight.ts";
+export { DEFAULT_D1_MAX_WRITE_BATCH_SIZE } from "./d1/d1-batch-executor.ts";
 export { D1QuadStream } from "./rdfjs-store/d1-quad-stream.ts";
 export { D1QuadStore } from "./quad-store/mod.ts";
 export type { D1QuadStoreOptions } from "./quad-store/mod.ts";

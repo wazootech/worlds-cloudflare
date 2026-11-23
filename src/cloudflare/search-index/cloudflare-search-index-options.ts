@@ -47,6 +47,6 @@ export interface CloudflareSearchIndexOptions extends D1ClientBaseOptions {
   /** limit establishes optional page sizing constraints for search result sets, defaulting to 100. */
   limit?: number;
 
-  /** maxWriteBatchSize caps statements per D1 batch during reindex (default 500). */
+  /** maxWriteBatchSize caps statements per D1 batch during reindex (default 2,000). */
   maxWriteBatchSize?: number;
 }
