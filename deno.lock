@@ -6,9 +6,9 @@
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@std/internal@^1.0.14": "1.0.14",
     "jsr:@std/path@^1.1.5": "1.1.6",
-    "jsr:@wazoo/reasoner@~0.4.1": "0.4.1",
-    "jsr:@wazoo/sparql-engine@0.4.4": "0.4.4",
-    "jsr:@wazoo/sparql-engine@0.5": "0.5.0",
+    "jsr:@wazoo/reasoner@~0.4.1": "0.4.2",
+    "jsr:@wazoo/sparql-engine@0.5": "0.5.1",
+    "jsr:@wazoo/sparql-engine@~0.5.1": "0.5.1",
     "jsr:@worlds/client@0.1": "0.1.0",
     "jsr:@worlds/sdk@0.11": "0.11.0",
     "jsr:@worlds/sdk@0.11.0": "0.11.0",
@@ -42,21 +42,15 @@
         "jsr:@std/internal@^1.0.14"
       ]
     },
-    "@wazoo/reasoner@0.4.1": {
-      "integrity": "f401ad2cfa0459de50c859724051f78e560e681fd0fd2b68a80ba2ad3b987478",
+    "@wazoo/reasoner@0.4.2": {
+      "integrity": "c3fbe3a15c72d24d0bd63e6e39be0ea95166395c1bc96a864e878dfc868cde27",
       "dependencies": [
-        "jsr:@wazoo/sparql-engine@0.4.4",
+        "jsr:@wazoo/sparql-engine@~0.5.1",
         "npm:@rdfjs/types"
       ]
     },
-    "@wazoo/sparql-engine@0.4.4": {
-      "integrity": "a3c88d00fddf13ca078321463e554d52c8d8e8d083adfcd2df08e7b9bd289c53",
-      "dependencies": [
-        "npm:@rdfjs/types"
-      ]
-    },
-    "@wazoo/sparql-engine@0.5.0": {
-      "integrity": "2ffa7d4a542e0a3ddb4b75fb6fcf88d295d81b9ba99eedfd0904dbd2497b0afc",
+    "@wazoo/sparql-engine@0.5.1": {
+      "integrity": "f4c3b63d3b45512ad1b40553fa240accd90f8ea106073207a1cee856768f5825",
       "dependencies": [
         "npm:@rdfjs/types"
       ]
