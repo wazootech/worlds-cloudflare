@@ -1,9 +1,11 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected } from "../../../test/thrown.ts";
 import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 import { D1RdfjsStore } from "@/cloudflare/rdfjs-store/mod.ts";
 import { checkD1SchemaCompatibility } from "./d1-schema-compatibility.ts";
 
-Deno.test("runtime D1 DDL uses canonical primary and reference columns", async () => {
+test("runtime D1 DDL uses canonical primary and reference columns", async () => {
   const substrate = await createTestD1();
   try {
     const store = new D1RdfjsStore({
@@ -23,14 +25,17 @@ Deno.test("runtime D1 DDL uses canonical primary and reference columns", async (
         name: string;
         pk: number;
       }>({ sql: `PRAGMA table_info(${table})` });
-      assertEquals(
+      assert.deepStrictEqual(
         columns.rows.filter((column) => column.pk > 0).map((column) =>
           column.name
         ).sort().join(","),
         expectedKey,
         `${table} primary key`,
       );
-      assertEquals(columns.rows.some((column) => column.name === "id"), false);
+      assert.deepStrictEqual(
+        columns.rows.some((column) => column.name === "id"),
+        false,
+      );
     }
 
     const quads = await substrate.connection.execute<{ name: string }>({
@@ -39,24 +44,30 @@ Deno.test("runtime D1 DDL uses canonical primary and reference columns", async (
     const chunks = await substrate.connection.execute<{ name: string }>({
       sql: "PRAGMA table_info(chunks)",
     });
-    assertEquals(quads.rows.some((column) => column.name === "world_id"), true);
-    assertEquals(
+    assert.deepStrictEqual(
+      quads.rows.some((column) => column.name === "world_id"),
+      true,
+    );
+    assert.deepStrictEqual(
       chunks.rows.some((column) => column.name === "world_id"),
       true,
     );
-    assertEquals(chunks.rows.some((column) => column.name === "quad_id"), true);
+    assert.deepStrictEqual(
+      chunks.rows.some((column) => column.name === "quad_id"),
+      true,
+    );
 
     const fts = await substrate.connection.execute<{ sql: string }>({
       sql:
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'chunks_fts'",
     });
-    assertEquals(
+    assert.deepStrictEqual(
       (fts.rows[0]?.sql ?? "").replaceAll(/\s+/g, "").toLowerCase().includes(
         "content='chunks',content_rowid='chunk_id'",
       ),
       true,
     );
-    assertEquals(
+    assert.deepStrictEqual(
       await checkD1SchemaCompatibility(substrate.connection, {
         worldId: "world-a",
       }),
@@ -67,7 +78,7 @@ Deno.test("runtime D1 DDL uses canonical primary and reference columns", async (
   }
 });
 
-Deno.test("ensureSchema fails closed on legacy schemas without changing them", async () => {
+test("ensureSchema fails closed on legacy schemas without changing them", async () => {
   const substrate = await createTestD1();
   try {
     const legacyWorldColumn = "world_" + "u" + "id";
@@ -80,7 +91,7 @@ Deno.test("ensureSchema fails closed on legacy schemas without changing them", a
       connection: substrate.connection,
       worldId: "world-a",
     });
-    await assertRejects(
+    await rejected(
       () => store.ensureSchema(),
       Error,
       "D1 schema is incompatible",
@@ -89,7 +100,7 @@ Deno.test("ensureSchema fails closed on legacy schemas without changing them", a
     const tables = await substrate.connection.execute<{ name: string }>({
       sql: "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
     });
-    assertEquals(
+    assert.deepStrictEqual(
       tables.rows
         .map((row) => row.name)
         .filter((name) => !name.startsWith("_cf_")),
@@ -98,7 +109,7 @@ Deno.test("ensureSchema fails closed on legacy schemas without changing them", a
     const columns = await substrate.connection.execute<{ name: string }>({
       sql: "PRAGMA table_info(quads)",
     });
-    assertEquals(columns.rows.map((row) => row.name), [
+    assert.deepStrictEqual(columns.rows.map((row) => row.name), [
       "id",
       legacyWorldColumn,
     ]);
