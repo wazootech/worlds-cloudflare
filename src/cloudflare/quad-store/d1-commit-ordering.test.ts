@@ -22,7 +22,7 @@ function embedder(length: number, calls: string[][]): EmbeddingService {
   return {
     embed: (texts) => {
       calls.push([...texts]);
-      return Promise.resolve(texts.map(() => new Array(length).fill(0.5)));
+      return Promise.resolve(texts.map(() => Array.from({ length }, () => 0.5)));
     },
   };
 }
