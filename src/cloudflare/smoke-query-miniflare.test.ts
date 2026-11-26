@@ -1,8 +1,9 @@
-import { assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { createCloudflareWorldsSdk } from "@/cloudflare/create-cloudflare-sdk.ts";
 import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 
-Deno.test("Miniflare D1 - smoke SPARQL prefix and semicolon INSERT round trips", async () => {
+test("Miniflare D1 - smoke SPARQL prefix and semicolon INSERT round trips", async () => {
   const substrate = await createTestD1();
   try {
     const sdk = await createCloudflareWorldsSdk({
@@ -18,7 +19,7 @@ INSERT DATA {
            ex:city "Portland" .
 }`,
     });
-    assertEquals(insert.kind, "void");
+    assert.deepStrictEqual(insert.kind, "void");
 
     const select = await sdk.sparql({
       query: `PREFIX ex: <http://example.org/>
@@ -28,13 +29,13 @@ SELECT ?name ?age ?city WHERE {
            ex:city ?city .
 }`,
     });
-    assertEquals(select.kind, "select");
+    assert.deepStrictEqual(select.kind, "select");
     if (select.kind !== "select") throw new Error("expected SELECT response");
     const bindings = select.data.results.bindings;
-    assertEquals(bindings.length, 1);
-    assertEquals(bindings[0].name.value, "Alice");
-    assertEquals(bindings[0].age.value, "30");
-    assertEquals(bindings[0].city.value, "Portland");
+    assert.deepStrictEqual(bindings.length, 1);
+    assert.deepStrictEqual(bindings[0].name.value, "Alice");
+    assert.deepStrictEqual(bindings[0].age.value, "30");
+    assert.deepStrictEqual(bindings[0].city.value, "Portland");
   } finally {
     await substrate.dispose();
   }
