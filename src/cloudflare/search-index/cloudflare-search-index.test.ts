@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { CloudflareSearchIndex } from "./mod.ts";
@@ -57,7 +58,7 @@ async function createTestContext(): Promise<TestSearchIndexContext> {
   };
 }
 
-Deno.test("CloudflareSearchIndex - keyword search matches indexed literal text", async () => {
+test("CloudflareSearchIndex - keyword search matches indexed literal text", async () => {
   const { searchIndex, quadStore, dispose } = await createTestContext();
   try {
     await quadStore.import({
@@ -74,14 +75,14 @@ Deno.test("CloudflareSearchIndex - keyword search matches indexed literal text",
     });
 
     const response = await searchIndex.search({ query: "Ethan" });
-    assertEquals(response.results?.length, 1);
-    assertEquals(response.results?.[0].subject, "urn:ethan");
+    assert.deepStrictEqual(response.results?.length, 1);
+    assert.deepStrictEqual(response.results?.[0].subject, "urn:ethan");
   } finally {
     await dispose();
   }
 });
 
-Deno.test("CloudflareSearchIndex - graph-scoped search excludes other graphs", async () => {
+test("CloudflareSearchIndex - graph-scoped search excludes other graphs", async () => {
   const { searchIndex, quadStore, dispose } = await createTestContext();
   try {
     await quadStore.import({
@@ -108,21 +109,21 @@ Deno.test("CloudflareSearchIndex - graph-scoped search excludes other graphs", a
       query: "Gregory",
       include: { graphs: ["urn:graphA"] },
     });
-    assertEquals(scoped.results?.length, 1);
-    assertEquals(scoped.results?.[0].subject, "urn:ethan");
+    assert.deepStrictEqual(scoped.results?.length, 1);
+    assert.deepStrictEqual(scoped.results?.[0].subject, "urn:ethan");
 
     const excluded = await searchIndex.search({
       query: "Gregory",
       exclude: { graphs: ["urn:graphB"] },
     });
-    assertEquals(excluded.results?.length, 1);
-    assertEquals(excluded.results?.[0].subject, "urn:ethan");
+    assert.deepStrictEqual(excluded.results?.length, 1);
+    assert.deepStrictEqual(excluded.results?.[0].subject, "urn:ethan");
   } finally {
     await dispose();
   }
 });
 
-Deno.test("CloudflareSearchIndex - emits contract-normalized rrf scores with scoreType", async () => {
+test("CloudflareSearchIndex - emits contract-normalized rrf scores with scoreType", async () => {
   const { searchIndex, quadStore, dispose } = await createTestContext();
   try {
     await quadStore.import({
@@ -145,23 +146,23 @@ Deno.test("CloudflareSearchIndex - emits contract-normalized rrf scores with sco
 
     const response = await searchIndex.search({ query: "beta" });
     const results = response.results ?? [];
-    assertEquals(results.length, 2);
+    assert.deepStrictEqual(results.length, 2);
 
     // Rows arrive ordered by rank (best first), so rank 0 maps to exactly 1.0
     // on the contract scale (score = k/(k+rank), k = 60).
-    assertEquals(results[0].score, 1.0);
-    assertEquals(results[0].scoreType, "rrf");
+    assert.deepStrictEqual(results[0].score, 1.0);
+    assert.deepStrictEqual(results[0].scoreType, "rrf");
 
     // Monotone: lower-ranked hits score strictly below rank 0, still on [0, 1].
-    assertEquals(results[1].score < results[0].score, true);
-    assertEquals(results[1].score > 0 && results[1].score < 1, true);
-    assertEquals(results[1].scoreType, "rrf");
+    assert.deepStrictEqual(results[1].score < results[0].score, true);
+    assert.deepStrictEqual(results[1].score > 0 && results[1].score < 1, true);
+    assert.deepStrictEqual(results[1].scoreType, "rrf");
   } finally {
     await dispose();
   }
 });
 
-Deno.test("CloudflareSearchIndex - candidateCount sizes the internal SQL candidate pool", async () => {
+test("CloudflareSearchIndex - candidateCount sizes the internal SQL candidate pool", async () => {
   const { quadStore, connection, searchQueryBuilder, dispose } =
     await createTestContext();
   try {
@@ -197,7 +198,7 @@ Deno.test("CloudflareSearchIndex - candidateCount sizes the internal SQL candida
       candidateCount: 1,
     });
     const one = await poolOne.search({ query: "shared" });
-    assertEquals(one.results?.length, 1);
+    assert.deepStrictEqual(one.results?.length, 1);
 
     // Without candidateCount, the pool defaults to limit (100), returning all
     // three candidate hits.
@@ -207,13 +208,13 @@ Deno.test("CloudflareSearchIndex - candidateCount sizes the internal SQL candida
       textSplitter: new RecursiveCharacterTextSplitter({ chunkSize: 1000 }),
     });
     const all = await poolAll.search({ query: "shared" });
-    assertEquals(all.results?.length, 3);
+    assert.deepStrictEqual(all.results?.length, 3);
   } finally {
     await dispose();
   }
 });
 
-Deno.test("CloudflareSearchIndex - minScore floor applies to the normalized scale", async () => {
+test("CloudflareSearchIndex - minScore floor applies to the normalized scale", async () => {
   const { searchIndex, quadStore, dispose } = await createTestContext();
   try {
     await quadStore.import({
@@ -241,24 +242,24 @@ Deno.test("CloudflareSearchIndex - minScore floor applies to the normalized scal
       minScore: 1.0,
     });
     const results = response.results ?? [];
-    assertEquals(results.length, 1);
-    assertEquals(results[0].score, 1.0);
+    assert.deepStrictEqual(results.length, 1);
+    assert.deepStrictEqual(results[0].score, 1.0);
   } finally {
     await dispose();
   }
 });
 
-Deno.test("CloudflareSearchIndex - pure punctuation query returns no results", async () => {
+test("CloudflareSearchIndex - pure punctuation query returns no results", async () => {
   const { searchIndex, dispose } = await createTestContext();
   try {
     const response = await searchIndex.search({ query: "!!!" });
-    assertEquals(response.results?.length, 0);
+    assert.deepStrictEqual(response.results?.length, 0);
   } finally {
     await dispose();
   }
 });
 
-Deno.test("CloudflareSearchIndex - reindex rebuilds chunks from durable quads", async () => {
+test("CloudflareSearchIndex - reindex rebuilds chunks from durable quads", async () => {
   const { searchIndex, connection, store, searchQueryBuilder, dispose } =
     await createTestContext();
   try {
@@ -282,26 +283,29 @@ Deno.test("CloudflareSearchIndex - reindex rebuilds chunks from durable quads", 
     });
 
     const before = await searchIndex.search({ query: "Sandra" });
-    assertEquals(before.results?.length, 0);
+    assert.deepStrictEqual(before.results?.length, 0);
 
     const report = await searchIndex.reindex();
-    assertEquals(report.processedQuadCount, 1);
-    assertEquals(report.chunkRowCount, 1);
+    assert.deepStrictEqual(report.processedQuadCount, 1);
+    assert.deepStrictEqual(report.chunkRowCount, 1);
 
     const after = await searchIndex.search({ query: "Sandra" });
-    assertEquals(after.results?.length, 1);
-    assertEquals(after.results?.[0].subject, "urn:sandra");
+    assert.deepStrictEqual(after.results?.length, 1);
+    assert.deepStrictEqual(after.results?.[0].subject, "urn:sandra");
   } finally {
     await dispose();
   }
 });
 
-Deno.test("CloudflareSearchIndex - sanitizeFtsQuery strips stopwords and wraps tokens", () => {
+test("CloudflareSearchIndex - sanitizeFtsQuery strips stopwords and wraps tokens", () => {
   const builder = new D1SearchQueryBuilder(32);
-  assertEquals(
+  assert.deepStrictEqual(
     builder.sanitizeFtsQuery("the quick brown fox"),
     '"quick" "brown" "fox"',
   );
-  assertEquals(builder.sanitizeFtsQuery("!!!"), "");
-  assertEquals(builder.sanitizeFtsQuery("Memory SDK"), '"memory" "sdk"');
+  assert.deepStrictEqual(builder.sanitizeFtsQuery("!!!"), "");
+  assert.deepStrictEqual(
+    builder.sanitizeFtsQuery("Memory SDK"),
+    '"memory" "sdk"',
+  );
 });

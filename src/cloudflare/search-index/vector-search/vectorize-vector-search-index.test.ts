@@ -1,4 +1,6 @@
-import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected, thrown } from "../../../../test/thrown.ts";
 import { VectorizeVectorSearchIndex } from "./vectorize-vector-search-index.ts";
 import type { VectorizeIndexLike } from "./vector-search-index.ts";
 import { createCloudflareWorldsSdk } from "../../create-cloudflare-sdk.ts";
@@ -57,10 +59,10 @@ const entry = (metadata: Record<string, string> = {}) => ({
   metadata: { subject: "urn:s", predicate: "urn:p", value: "v", ...metadata },
 });
 
-Deno.test("vectorize index refuses to exist without a worldId (#41)", () => {
+test("vectorize index refuses to exist without a worldId (#41)", () => {
   const index = new InMemoryVectorize();
   for (const worldId of [undefined, ""]) {
-    assertThrows(
+    thrown(
       () =>
         new VectorizeVectorSearchIndex({
           index,
@@ -72,41 +74,49 @@ Deno.test("vectorize index refuses to exist without a worldId (#41)", () => {
   }
 });
 
-Deno.test("every upsert is stamped with world_id and the contract result id", async () => {
+test("every upsert is stamped with world_id and the contract result id", async () => {
   const index = new InMemoryVectorize();
   await new VectorizeVectorSearchIndex({ index, worldId: WORLD_A }).upsert([
     entry(),
   ]);
   const [[physicalId, stored]] = [...index.vectors.entries()];
-  assertEquals(stored.metadata.world_id, WORLD_A);
-  assertEquals(stored.metadata.result_id, RESULT_ID);
-  assert(physicalId !== RESULT_ID, "physical id is namespaced by world");
-  assert(physicalId.length <= 64, "fits Vectorize's 64-byte id limit");
+  assert.deepStrictEqual(stored.metadata.world_id, WORLD_A);
+  assert.deepStrictEqual(stored.metadata.result_id, RESULT_ID);
+  assert.ok(physicalId !== RESULT_ID, "physical id is namespaced by world");
+  assert.ok(physicalId.length <= 64, "fits Vectorize's 64-byte id limit");
 });
 
-Deno.test("identical triple text in two worlds does not collide", async () => {
+test("identical triple text in two worlds does not collide", async () => {
   const index = new InMemoryVectorize();
   const a = new VectorizeVectorSearchIndex({ index, worldId: WORLD_A });
   const b = new VectorizeVectorSearchIndex({ index, worldId: WORLD_B });
   await a.upsert([entry()]);
   await b.upsert([entry()]);
-  assertEquals(index.vectors.size, 2, "both worlds keep their vector");
+  assert.deepStrictEqual(
+    index.vectors.size,
+    2,
+    "both worlds keep their vector",
+  );
 
   await b.deleteByIds([RESULT_ID]);
-  assertEquals(index.vectors.size, 1, "B's delete leaves A's vector alone");
+  assert.deepStrictEqual(
+    index.vectors.size,
+    1,
+    "B's delete leaves A's vector alone",
+  );
   const hits = await a.query([0.1, 0.2], { topK: 5 });
-  assertEquals(hits.map((hit) => hit.id), [RESULT_ID]);
+  assert.deepStrictEqual(hits.map((hit) => hit.id), [RESULT_ID]);
 });
 
-Deno.test("queries are always world-scoped and return contract ids", async () => {
+test("queries are always world-scoped and return contract ids", async () => {
   const index = new InMemoryVectorize();
   const a = new VectorizeVectorSearchIndex({ index, worldId: WORLD_A });
   const b = new VectorizeVectorSearchIndex({ index, worldId: WORLD_B });
   await a.upsert([entry({ predicate: "urn:only-a" })]);
 
-  assertEquals(await b.query([0.1, 0.2], { topK: 5 }), []);
+  assert.deepStrictEqual(await b.query([0.1, 0.2], { topK: 5 }), []);
   // A caller filter narrows within the world; it never replaces the scope.
-  assertEquals(
+  assert.deepStrictEqual(
     await b.query([0.1, 0.2], { topK: 5, filter: { subject: "urn:s" } }),
     [],
   );
@@ -114,28 +124,28 @@ Deno.test("queries are always world-scoped and return contract ids", async () =>
     topK: 5,
     filter: { subject: "urn:s" },
   });
-  assertEquals(hits.length, 1);
-  assertEquals(hits[0].id, RESULT_ID);
+  assert.deepStrictEqual(hits.length, 1);
+  assert.deepStrictEqual(hits[0].id, RESULT_ID);
 });
 
-Deno.test("a filter or entry naming another world is refused", async () => {
+test("a filter or entry naming another world is refused", async () => {
   const index = new InMemoryVectorize();
   const a = new VectorizeVectorSearchIndex({ index, worldId: WORLD_A });
-  await assertRejects(
+  await rejected(
     () => a.query([0.1], { topK: 1, filter: { world_id: WORLD_B } }),
     Error,
     "scoped to",
   );
-  await assertRejects(
+  await rejected(
     () => a.upsert([entry({ world_id: WORLD_B })]),
     Error,
     "scoped to",
   );
-  assertEquals(index.vectors.size, 0);
+  assert.deepStrictEqual(index.vectors.size, 0);
 });
 
-Deno.test("createCloudflareWorldsSdk rejects vectorize without worldId", async () => {
-  await assertRejects(
+test("createCloudflareWorldsSdk rejects vectorize without worldId", async () => {
+  await rejected(
     () =>
       createCloudflareWorldsSdk({
         database: {} as never,
