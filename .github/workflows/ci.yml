@@ -1,9 +1,9 @@
 name: CI
 
 on:
+  # Any base branch, so each PR of a stacked series runs CI (a branches filter
+  # would skip every PR that is not based on main).
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
