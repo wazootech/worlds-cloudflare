@@ -10,7 +10,8 @@ this repo's specifics:
   check, tests). The toolchain is Bun: `bun fmt --no-script`, Oxlint
   (`oxlint --deny-warnings`, `.oxlintrc.json`), `bun check --no-script`
   (`tsc`), `bun test`. Code and tests are Node-compatible (`node:test`,
-  `node:assert/strict`, `node:*` APIs) and also run on Deno.
+  `node:assert/strict`, `node:*` APIs); the suite also passed on Deno before the
+  cutover (#104), but nothing in CI runs it there now.
 - Install with `bun install --frozen-lockfile --ignore-scripts`. `jsr.json` is
   the published manifest and `package.json` mirrors it for Bun;
   `bun run check:manifests` fails on drift.

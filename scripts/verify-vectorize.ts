@@ -4,8 +4,7 @@
  * `wrangler vectorize get` and `list-metadata-index`. Exit code 1 on any
  * problem, so it can gate a deploy or a human's post-provision checklist.
  *
- *   deno task vectorize:verify <index-name> [--dimensions 1536]
- *   bun scripts/verify-vectorize.ts <index-name> [--dimensions 1536]
+ *   bun run vectorize:verify <index-name> [--dimensions 1536]
  *
  * Requires wrangler credentials for the account that owns the index
  * (CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID or `wrangler login`).
@@ -56,7 +55,7 @@ if (dimIndex >= 0) {
 const name = args[0];
 if (!name) {
   console.error(
-    "usage: deno task vectorize:verify <index-name> [--dimensions N]",
+    "usage: bun run vectorize:verify <index-name> [--dimensions N]",
   );
   process.exit(2);
 }
