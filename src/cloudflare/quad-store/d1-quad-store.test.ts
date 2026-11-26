@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { D1QuadStore } from "./mod.ts";
@@ -46,7 +47,7 @@ async function createTestQuadStore(options?: {
   };
 }
 
-Deno.test("D1QuadStore - merge import adds quads without deleting existing", async () => {
+test("D1QuadStore - merge import adds quads without deleting existing", async () => {
   const { quadStore, store, dispose } = await createTestQuadStore();
   try {
     await quadStore.import({
@@ -67,13 +68,13 @@ Deno.test("D1QuadStore - merge import adds quads without deleting existing", asy
     });
 
     const quads = await store.getQuads();
-    assertEquals(quads.length, 2);
+    assert.deepStrictEqual(quads.length, 2);
   } finally {
     await dispose();
   }
 });
 
-Deno.test("D1QuadStore - replace import wipes existing quads", async () => {
+test("D1QuadStore - replace import wipes existing quads", async () => {
   const { quadStore, store, dispose } = await createTestQuadStore();
   try {
     await quadStore.import({
@@ -95,14 +96,14 @@ Deno.test("D1QuadStore - replace import wipes existing quads", async () => {
     });
 
     const quads = await store.getQuads();
-    assertEquals(quads.length, 1);
-    assertEquals(quads[0].subject.value, "urn:b");
+    assert.deepStrictEqual(quads.length, 1);
+    assert.deepStrictEqual(quads[0].subject.value, "urn:b");
   } finally {
     await dispose();
   }
 });
 
-Deno.test("D1QuadStore - export returns the stored quads", async () => {
+test("D1QuadStore - export returns the stored quads", async () => {
   const { quadStore, dispose } = await createTestQuadStore();
   try {
     await quadStore.import({
@@ -118,14 +119,14 @@ Deno.test("D1QuadStore - export returns the stored quads", async () => {
     if (exported.kind !== "quads") {
       throw new Error("expected quad export");
     }
-    assertEquals(exported.quads.length, 1);
-    assertEquals(exported.quads[0].subject.value, "urn:a");
+    assert.deepStrictEqual(exported.quads.length, 1);
+    assert.deepStrictEqual(exported.quads[0].subject.value, "urn:a");
   } finally {
     await dispose();
   }
 });
 
-Deno.test("D1QuadStore - deferred import persists quads and reindexes search chunks", async () => {
+test("D1QuadStore - deferred import persists quads and reindexes search chunks", async () => {
   const { quadStore, store, dispose } = await createTestQuadStore({
     searchIndexOnImport: "deferred",
   });
@@ -144,13 +145,13 @@ Deno.test("D1QuadStore - deferred import persists quads and reindexes search chu
     });
 
     const quads = await store.getQuads();
-    assertEquals(quads.length, 1);
+    assert.deepStrictEqual(quads.length, 1);
   } finally {
     await dispose();
   }
 });
 
-Deno.test("D1QuadStore - createTransaction commits an atomic patch", async () => {
+test("D1QuadStore - createTransaction commits an atomic patch", async () => {
   const { quadStore, store, dispose } = await createTestQuadStore({
     searchIndexOnImport: "disabled",
   });
@@ -175,8 +176,8 @@ Deno.test("D1QuadStore - createTransaction commits an atomic patch", async () =>
     await transaction.commit({ importMode: "merge" });
 
     const quads = await store.getQuads();
-    assertEquals(quads.length, 1);
-    assertEquals(quads[0].subject.value, "urn:ethan");
+    assert.deepStrictEqual(quads.length, 1);
+    assert.deepStrictEqual(quads[0].subject.value, "urn:ethan");
   } finally {
     await dispose();
   }

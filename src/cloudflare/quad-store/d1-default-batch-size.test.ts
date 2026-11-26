@@ -1,4 +1,5 @@
-import { assert, assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import type { EmbeddingService } from "@worlds/sdk/search-index/embedding-service";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
@@ -90,43 +91,43 @@ async function chunkCount(connection: D1ConnectionDriver): Promise<number> {
  * fits both. 400 quads write about 800 statements and 384-dim vectors weigh
  * about 3 MB: one atomic batch (the 750 default sent 375+ quads to the fallback).
  */
-Deno.test("an import of 400 quads with 384-dim vectors is one atomic batch() under the defaults", async () => {
+test("an import of 400 quads with 384-dim vectors is one atomic batch() under the defaults", async () => {
   const { substrate, connection, store, quadStore } = await createImportStore(
     384,
   );
   try {
     await quadStore.createTransaction().addQuads(quadsOf(400)).commit();
-    assertEquals(connection.batches.length, 1);
+    assert.deepStrictEqual(connection.batches.length, 1);
     const size = connection.batches[0]!.length;
-    assert(size > 750 && size <= DEFAULT_D1_MAX_WRITE_BATCH_SIZE, `${size}`);
-    assert(weightOf(connection.batches[0]!) <= DEFAULT_D1_MAX_BATCH_WEIGHT);
-    assertEquals((await store.getQuads()).length, 400);
-    assertEquals(await chunkCount(connection), 400);
+    assert.ok(size > 750 && size <= DEFAULT_D1_MAX_WRITE_BATCH_SIZE, `${size}`);
+    assert.ok(weightOf(connection.batches[0]!) <= DEFAULT_D1_MAX_BATCH_WEIGHT);
+    assert.deepStrictEqual((await store.getQuads()).length, 400);
+    assert.deepStrictEqual(await chunkCount(connection), 400);
   } finally {
     await substrate.dispose();
   }
 });
 
-Deno.test("an import of 1,536-dim vectors above the byte budget takes the chunked fallback, every batch under budget", async () => {
+test("an import of 1,536-dim vectors above the byte budget takes the chunked fallback, every batch under budget", async () => {
   const { substrate, connection, store, quadStore } = await createImportStore(
     1536,
   );
   try {
     // About 800 chunk rows of ~25 KB estimated: over 16 MiB, under 2,000 statements.
     await quadStore.createTransaction().addQuads(quadsOf(800)).commit();
-    assert(connection.batches.length > 1, "the byte budget forces a split");
+    assert.ok(connection.batches.length > 1, "the byte budget forces a split");
     for (const batch of connection.batches) {
-      assert(batch.length <= DEFAULT_D1_MAX_WRITE_BATCH_SIZE);
-      assert(weightOf(batch) <= DEFAULT_D1_MAX_BATCH_WEIGHT, "over budget");
+      assert.ok(batch.length <= DEFAULT_D1_MAX_WRITE_BATCH_SIZE);
+      assert.ok(weightOf(batch) <= DEFAULT_D1_MAX_BATCH_WEIGHT, "over budget");
     }
-    assertEquals((await store.getQuads()).length, 800);
-    assertEquals(await chunkCount(connection), 800);
+    assert.deepStrictEqual((await store.getQuads()).length, 800);
+    assert.deepStrictEqual(await chunkCount(connection), 800);
   } finally {
     await substrate.dispose();
   }
 });
 
-Deno.test("a failed chunked import above the byte budget removes what the earlier batches wrote", async () => {
+test("a failed chunked import above the byte budget removes what the earlier batches wrote", async () => {
   const { substrate, connection, store, quadStore } = await createImportStore(
     1536,
   );
@@ -138,11 +139,11 @@ Deno.test("a failed chunked import above the byte budget removes what the earlie
     } catch (error) {
       failure = error;
     }
-    assert(failure instanceof Error, "the commit must reject");
-    assertEquals((await store.getQuads()).length, 0);
-    assertEquals(await chunkCount(connection), 0);
+    assert.ok(failure instanceof Error, "the commit must reject");
+    assert.deepStrictEqual((await store.getQuads()).length, 0);
+    assert.deepStrictEqual(await chunkCount(connection), 0);
     for (const batch of connection.batches) {
-      assert(weightOf(batch) <= DEFAULT_D1_MAX_BATCH_WEIGHT, "over budget");
+      assert.ok(weightOf(batch) <= DEFAULT_D1_MAX_BATCH_WEIGHT, "over budget");
     }
   } finally {
     await substrate.dispose();

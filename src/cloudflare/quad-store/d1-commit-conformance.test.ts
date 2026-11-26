@@ -1,4 +1,6 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected } from "../../../test/thrown.ts";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import type { Patch, TransactionContext } from "@worlds/sdk/quad-store";
 import { runCommitConformanceSuite } from "@worlds/sdk/testing";
@@ -242,13 +244,13 @@ async function runSuite(
       contract,
     });
     const failed = report.results.filter((r) => !r.ok);
-    assert(report.ok, `conformance failures: ${JSON.stringify(failed)}`);
+    assert.ok(report.ok, `conformance failures: ${JSON.stringify(failed)}`);
     // A skipped case is not a pass: the later-write case must actually run.
-    assertEquals(
+    assert.deepStrictEqual(
       (report.notes ?? []).filter((note) => note.includes("later-write")),
       [],
     );
-    assert(
+    assert.ok(
       report.results.some((r) =>
         r.name === "later-write failure follows the contract" && r.ok
       ),
@@ -272,7 +274,7 @@ async function runSuite(
  * there too. The `failLaterWrite` case exercises it here: the failing statement is a chunk-row
  * insert that comes after the quad inserts in the same batch.
  */
-Deno.test("D1 satisfies the shared commit conformance suite on the atomic path", async () => {
+test("D1 satisfies the shared commit conformance suite on the atomic path", async () => {
   await runSuite(undefined, {
     atomic: true,
     embeddingFailure: "throws",
@@ -282,7 +284,7 @@ Deno.test("D1 satisfies the shared commit conformance suite on the atomic path",
   });
 });
 
-Deno.test("D1 satisfies the shared commit conformance suite on the chunked fallback path", async () => {
+test("D1 satisfies the shared commit conformance suite on the chunked fallback path", async () => {
   // One statement per batch sends every commit down the fallback.
   await runSuite(1, {
     atomic: false,
@@ -294,7 +296,7 @@ Deno.test("D1 satisfies the shared commit conformance suite on the chunked fallb
   });
 });
 
-Deno.test("D1 satisfies the shared commit conformance suite on the byte-budget chunked path", async () => {
+test("D1 satisfies the shared commit conformance suite on the byte-budget chunked path", async () => {
   // A 1-byte budget puts every statement alone in its own batch.
   await runSuite(undefined, {
     atomic: false,
@@ -317,7 +319,7 @@ const two = quad(
   literal("two"),
 );
 
-Deno.test("a failed write after the first batch removes the novel quads and their chunk rows", async () => {
+test("a failed write after the first batch removes the novel quads and their chunk rows", async () => {
   const subject = await createD1Subject({
     searchIndexOnImport: "incremental",
     embeddingService: new FakeEmbeddingService(),
@@ -326,13 +328,13 @@ Deno.test("a failed write after the first batch removes the novel quads and thei
   try {
     // Batch 1 (the first quads) succeeds; batch 2 fails; the cleanup removes batch 1.
     subject.failWriteAfter(1);
-    await assertRejects(
+    await rejected(
       () => subject.commit({ insertions: [one, two], deletions: [] }),
       Error,
       "injected D1 write failure",
     );
-    assertEquals(await subject.storedQuads(), []);
-    assertEquals(await subject.chunkedQuadIds(), []);
+    assert.deepStrictEqual(await subject.storedQuads(), []);
+    assert.deepStrictEqual(await subject.chunkedQuadIds(), []);
   } finally {
     await subject.dispose();
   }
@@ -345,7 +347,7 @@ for (
     ["byte-budget batches", undefined, 1],
   ] as const
 ) {
-  Deno.test(`the later-write failure follows the quad writes (${name})`, async () => {
+  test(`the later-write failure follows the quad writes (${name})`, async () => {
     const subject = await createD1Subject({
       searchIndexOnImport: "incremental",
       embeddingService: new FakeEmbeddingService(),
@@ -354,25 +356,25 @@ for (
     });
     try {
       subject.failLaterWrite();
-      await assertRejects(() =>
+      await rejected(() =>
         subject.commit({ insertions: [one, two], deletions: [] })
       );
       const failure = subject.laterFailure();
-      assert(failure, "the armed failure must fire");
+      assert.ok(failure, "the armed failure must fire");
       const quadWrites = failure.statements.map((sql, index) => ({
         sql,
         index,
       }))
         .filter(({ sql }) => sql.includes(" INTO quads "));
-      assert(quadWrites.length > 0, "the commit must write quads");
-      assert(
+      assert.ok(quadWrites.length > 0, "the commit must write quads");
+      assert.ok(
         quadWrites.every(({ index }) => index < failure.failedAt),
         `every quad insert must precede the failing write: ${
           JSON.stringify(failure)
         }`,
       );
-      assertEquals(await subject.storedQuads(), []);
-      assertEquals(await subject.chunkedQuadIds(), []);
+      assert.deepStrictEqual(await subject.storedQuads(), []);
+      assert.deepStrictEqual(await subject.chunkedQuadIds(), []);
     } finally {
       await subject.dispose();
     }

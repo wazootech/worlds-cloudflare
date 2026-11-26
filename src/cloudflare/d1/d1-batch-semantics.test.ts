@@ -1,4 +1,6 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected } from "../../../test/thrown.ts";
 import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 
 /**
@@ -36,27 +38,31 @@ async function count(
   return Number(rows[0]!.n);
 }
 
-Deno.test("a batch rolls back every statement when one fails", () =>
+test("a batch rolls back every statement when one fails", () =>
   withTable(async (substrate) => {
     await substrate.connection.batch([insert(1), insert(2)]);
-    await assertRejects(() =>
+    await rejected(() =>
       substrate.connection.batch([insert(3), insert(4), insert(1)])
     );
-    assertEquals(await count(substrate), 2, "rows 3 and 4 must not persist");
+    assert.deepStrictEqual(
+      await count(substrate),
+      2,
+      "rows 3 and 4 must not persist",
+    );
   }));
 
-Deno.test("one batch() call accepts more statements than the 100 bound-parameter cap", () =>
+test("one batch() call accepts more statements than the 100 bound-parameter cap", () =>
   withTable(async (substrate) => {
     const statements = Array.from({ length: 250 }, (_, i) => insert(i + 1));
     await substrate.connection.batch(statements);
-    assertEquals(await count(substrate), 250);
+    assert.deepStrictEqual(await count(substrate), 250);
   }));
 
-Deno.test("chunked batches are independent: a later failure keeps earlier batches", () =>
+test("chunked batches are independent: a later failure keeps earlier batches", () =>
   withTable(async (substrate) => {
     await substrate.connection.batch([insert(1), insert(2)]);
-    await assertRejects(() => substrate.connection.batch([insert(2)]));
-    assert(
+    await rejected(() => substrate.connection.batch([insert(2)]));
+    assert.ok(
       (await count(substrate)) === 2,
       "the earlier batch stays committed; only the failing batch rolls back",
     );

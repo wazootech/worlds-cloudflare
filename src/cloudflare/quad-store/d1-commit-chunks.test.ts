@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { D1QuadStore } from "./mod.ts";
@@ -35,27 +36,27 @@ async function setup() {
   return { substrate, store, quadStore, chunkCount };
 }
 
-Deno.test("deleting and re-adding a quad in one patch replaces its chunk row instead of duplicating it", async () => {
+test("deleting and re-adding a quad in one patch replaces its chunk row instead of duplicating it", async () => {
   const t = await setup();
   try {
     await t.quadStore.createTransaction().addQuads([fact]).commit();
-    assertEquals(await t.chunkCount(), 1);
+    assert.deepStrictEqual(await t.chunkCount(), 1);
     await t.quadStore.createTransaction().removeQuads([fact]).addQuads([fact])
       .commit();
-    assertEquals((await t.store.getQuads()).length, 1);
-    assertEquals(await t.chunkCount(), 1);
+    assert.deepStrictEqual((await t.store.getQuads()).length, 1);
+    assert.deepStrictEqual(await t.chunkCount(), 1);
   } finally {
     await t.substrate.dispose();
   }
 });
 
-Deno.test("deleting a quad leaves its chunk row for the vector-id orphan cleanup", async () => {
+test("deleting a quad leaves its chunk row for the vector-id orphan cleanup", async () => {
   const t = await setup();
   try {
     await t.quadStore.createTransaction().addQuads([fact]).commit();
     await t.quadStore.createTransaction().removeQuads([fact]).commit();
-    assertEquals((await t.store.getQuads()).length, 0);
-    assertEquals(await t.chunkCount(), 1);
+    assert.deepStrictEqual((await t.store.getQuads()).length, 0);
+    assert.deepStrictEqual(await t.chunkCount(), 1);
   } finally {
     await t.substrate.dispose();
   }
