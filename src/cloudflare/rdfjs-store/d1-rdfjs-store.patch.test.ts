@@ -51,7 +51,8 @@ test("D1RdfjsStore.applyPatch - world-scoped deletion of 100+ quads stays under 
         namedNode(`urn:s${index}`),
         namedNode("urn:p"),
         literal(`o${index}`),
-      ));
+      ),
+    );
     await store.applyPatch({ insertions: quads, deletions: [] });
     assert.deepStrictEqual(await store.countQuads(), 120);
 
@@ -159,11 +160,13 @@ test("D1RdfjsStore.applyPatch - 25 inserts chunk across insert statements", asyn
   try {
     const insertions: rdfjs.Quad[] = [];
     for (let index = 0; index < 25; index++) {
-      insertions.push(DataFactory.quad(
-        namedNode(`urn:s${index}`),
-        namedNode("urn:p"),
-        literal(`o${index}`),
-      ));
+      insertions.push(
+        DataFactory.quad(
+          namedNode(`urn:s${index}`),
+          namedNode("urn:p"),
+          literal(`o${index}`),
+        ),
+      );
     }
     await store.applyPatch({ insertions, deletions: [] });
     assert.deepStrictEqual(await store.countQuads(), 25);

@@ -60,7 +60,7 @@ export class D1TransactionImpl implements D1Transaction {
 /** quadKey builds a deduplication key for a quad (subject/predicate/object/graph values). */
 function quadKey(quad: rdfjs.Quad): string {
   const objectIsLiteral = quad.object.termType === "Literal";
-  const literal = objectIsLiteral ? quad.object as rdfjs.Literal : null;
+  const literal = objectIsLiteral ? (quad.object as rdfjs.Literal) : null;
   return [
     quad.subject.termType,
     quad.subject.value,

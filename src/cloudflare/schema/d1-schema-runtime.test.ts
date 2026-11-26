@@ -14,21 +14,21 @@ test("runtime D1 DDL uses canonical primary and reference columns", async () => 
     });
     await store.ensureSchema();
 
-    for (
-      const [table, expectedKey] of [
-        ["quads", "quad_id,world_id"],
-        ["chunks", "chunk_id"],
-        ["worlds_data_plane_schema", "schema_version_id"],
-      ]
-    ) {
+    for (const [table, expectedKey] of [
+      ["quads", "quad_id,world_id"],
+      ["chunks", "chunk_id"],
+      ["worlds_data_plane_schema", "schema_version_id"],
+    ]) {
       const columns = await substrate.connection.execute<{
         name: string;
         pk: number;
       }>({ sql: `PRAGMA table_info(${table})` });
       assert.deepStrictEqual(
-        columns.rows.filter((column) => column.pk > 0).map((column) =>
-          column.name
-        ).sort().join(","),
+        columns.rows
+          .filter((column) => column.pk > 0)
+          .map((column) => column.name)
+          .sort()
+          .join(","),
         expectedKey,
         `${table} primary key`,
       );
@@ -58,13 +58,13 @@ test("runtime D1 DDL uses canonical primary and reference columns", async () => 
     );
 
     const fts = await substrate.connection.execute<{ sql: string }>({
-      sql:
-        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'chunks_fts'",
+      sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'chunks_fts'",
     });
     assert.deepStrictEqual(
-      (fts.rows[0]?.sql ?? "").replaceAll(/\s+/g, "").toLowerCase().includes(
-        "content='chunks',content_rowid='chunk_id'",
-      ),
+      (fts.rows[0]?.sql ?? "")
+        .replaceAll(/\s+/g, "")
+        .toLowerCase()
+        .includes("content='chunks',content_rowid='chunk_id'"),
       true,
     );
     assert.deepStrictEqual(
@@ -83,8 +83,7 @@ test("ensureSchema fails closed on legacy schemas without changing them", async 
   try {
     const legacyWorldColumn = "world_" + "u" + "id";
     await substrate.connection.execute({
-      sql:
-        `CREATE TABLE quads (id TEXT PRIMARY KEY, ${legacyWorldColumn} TEXT)`,
+      sql: `CREATE TABLE quads (id TEXT PRIMARY KEY, ${legacyWorldColumn} TEXT)`,
     });
 
     const store = new D1RdfjsStore({
@@ -109,10 +108,10 @@ test("ensureSchema fails closed on legacy schemas without changing them", async 
     const columns = await substrate.connection.execute<{ name: string }>({
       sql: "PRAGMA table_info(quads)",
     });
-    assert.deepStrictEqual(columns.rows.map((row) => row.name), [
-      "id",
-      legacyWorldColumn,
-    ]);
+    assert.deepStrictEqual(
+      columns.rows.map((row) => row.name),
+      ["id", legacyWorldColumn],
+    );
   } finally {
     await substrate.dispose();
   }

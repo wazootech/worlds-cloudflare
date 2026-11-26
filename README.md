@@ -79,7 +79,7 @@ consumers:
   Worker-to-D1 RPC rejects a `batch()` whose serialized arguments exceed 32
   MiB**
   (`D1_ERROR: Serialized RPC arguments or return values are limited to
-  32MiB`).
+32MiB`).
   It is a byte limit, so the safe statement count depends on row size.
   - **Measured on a real D1 throwaway database, 2026-11-22** (Worker binding,
     `wrangler dev --remote`, the repo's `quads`/`chunks` schema with the 7 quad
@@ -120,6 +120,7 @@ consumers:
     1,536-dim) failed with `UNIQUE constraint failed` and left zero rows in
     `quads` and `chunks`; a last statement against a missing table did the same
     (rejected before any row was written).
+
   - **The byte estimate is an ESTIMATE, calibrated from those points.** The
     commit driver weighs each statement as its SQL text length, 64 bytes of
     overhead, and its bound parameters: strings by UTF-16 code units, BLOBs (the
@@ -252,14 +253,14 @@ With an import map:
 
 ```html
 <script type="importmap">
-{
-  "imports": {
-    "@worlds/cloudflare": "https://esm.sh/jsr/@worlds/cloudflare@0.8.0"
+  {
+    "imports": {
+      "@worlds/cloudflare": "https://esm.sh/jsr/@worlds/cloudflare@0.8.0"
+    }
   }
-}
 </script>
 <script type="module">
-import { createCloudflareWorldsSdk } from "@worlds/cloudflare";
+  import { createCloudflareWorldsSdk } from "@worlds/cloudflare";
 </script>
 ```
 

@@ -37,8 +37,8 @@ function expectedPackageSpec(alias: string, spec: string): string {
     // An alias key that differs from the package name keeps its npm: prefix.
     return body.slice(0, split) === alias ? body.slice(split + 1) : spec;
   }
-  const [, scope, name, range] = /^jsr:@([^/]+)\/([^@]+)@(.+)$/.exec(spec) ??
-    [];
+  const [, scope, name, range] =
+    /^jsr:@([^/]+)\/([^@]+)@(.+)$/.exec(spec) ?? [];
   return `npm:@jsr/${scope}__${name}@${range}`;
 }
 

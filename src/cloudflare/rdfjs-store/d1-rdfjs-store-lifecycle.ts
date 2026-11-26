@@ -26,8 +26,7 @@ export async function applyD1Schema(
   options: D1SchemaLifecycleOptions,
 ): Promise<void> {
   const existingTables = await connection.execute<{ name: string }>({
-    sql:
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('quads', 'chunks', 'chunks_fts', 'worlds_data_plane_schema')",
+    sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('quads', 'chunks', 'chunks_fts', 'worlds_data_plane_schema')",
   });
   if (existingTables.rows.length > 0) {
     await assertD1SchemaCompatible(connection, {
@@ -47,8 +46,7 @@ export async function applyD1Schema(
     await connection.execute({ sql: ddl });
   }
   await connection.execute({
-    sql:
-      `CREATE TABLE IF NOT EXISTS worlds_data_plane_schema (schema_version_id INTEGER PRIMARY KEY, version INTEGER NOT NULL UNIQUE, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+    sql: `CREATE TABLE IF NOT EXISTS worlds_data_plane_schema (schema_version_id INTEGER PRIMARY KEY, version INTEGER NOT NULL UNIQUE, applied_at TEXT NOT NULL DEFAULT (datetime('now')))`,
   });
   // Verify before stamping. The version row is the record that this database
   // holds the canonical schema, so it must only be written once the columns

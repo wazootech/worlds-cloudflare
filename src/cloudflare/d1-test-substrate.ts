@@ -29,7 +29,7 @@ export async function createTestD1(
     d1Databases: { DB: name },
     script: "export default { async fetch() { return new Response('ok'); } }",
   });
-  const database = await mf.getD1Database("DB") as unknown as D1DatabaseLike;
+  const database = (await mf.getD1Database("DB")) as unknown as D1DatabaseLike;
   const connection = new D1ConnectionDriver(database);
   return {
     database,

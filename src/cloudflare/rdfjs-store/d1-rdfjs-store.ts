@@ -112,14 +112,15 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     validateWorldId(options.worldId, "D1RdfjsStore");
     this.connection = options.connection;
     this.matchPageSize = options.matchPageSize ?? DEFAULT_D1_MATCH_PAGE_SIZE;
-    this.writeBatchSize = options.maxWriteBatchSize ??
-      DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
+    this.writeBatchSize =
+      options.maxWriteBatchSize ?? DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
     this.worldId = options.worldId;
     this.lookupChunkSize = effectiveLookupChunkSize(
       options.maxLookupChunkSize,
       Boolean(this.worldId),
     );
-    this.schemaBuilder = options.schemaBuilder ??
+    this.schemaBuilder =
+      options.schemaBuilder ??
       new D1SchemaBuilder(32, { worldId: options.worldId });
     this.requireDerivedColumn = options.requireDerivedColumn ?? false;
     this.writes = new D1WriteQueue(this.connection, this.worldId);
@@ -154,10 +155,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
    * context.importMode === "replace" clears quads and chunks first (the SDK's
    * replace-import contract).
    */
-  public applyPatch(
-    patch: Patch,
-    context?: TransactionContext,
-  ): Promise<void> {
+  public applyPatch(patch: Patch, context?: TransactionContext): Promise<void> {
     return this.writes.enqueueWrite(async () => {
       await applyD1Patch(
         {
@@ -190,28 +188,29 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     object?: rdfjs.Term,
     graph?: rdfjs.Term,
   ): this {
-    const quad = predicate !== undefined && object !== undefined
-      ? DataFactory.quad(
-        quadOrSubject as rdfjs.Quad_Subject,
-        predicate as rdfjs.Quad_Predicate,
-        object as rdfjs.Quad_Object,
-        graph as rdfjs.Quad_Graph,
-      )
-      : quadOrSubject as rdfjs.Quad;
-    this.writes.enqueueWrite(() =>
-      insertD1Quad(this.connection, this.worldId, quad)
-    ).catch((error: unknown) =>
-      logWriteFailure("addQuad", this.worldId, error)
-    );
+    const quad =
+      predicate !== undefined && object !== undefined
+        ? DataFactory.quad(
+            quadOrSubject as rdfjs.Quad_Subject,
+            predicate as rdfjs.Quad_Predicate,
+            object as rdfjs.Quad_Object,
+            graph as rdfjs.Quad_Graph,
+          )
+        : (quadOrSubject as rdfjs.Quad);
+    this.writes
+      .enqueueWrite(() => insertD1Quad(this.connection, this.worldId, quad))
+      .catch((error: unknown) =>
+        logWriteFailure("addQuad", this.worldId, error),
+      );
     return this;
   }
 
   public removeQuad(quad: rdfjs.Quad): this {
-    this.writes.enqueueWrite(() =>
-      deleteD1Quad(this.connection, this.worldId, quad)
-    ).catch((error: unknown) =>
-      logWriteFailure("removeQuad", this.worldId, error)
-    );
+    this.writes
+      .enqueueWrite(() => deleteD1Quad(this.connection, this.worldId, quad))
+      .catch((error: unknown) =>
+        logWriteFailure("removeQuad", this.worldId, error),
+      );
     return this;
   }
 
@@ -245,7 +244,7 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
         predicate,
         object,
         graph,
-      )
+      ),
     );
   }
 
@@ -287,17 +286,14 @@ export class D1RdfjsStore implements rdfjs.Store<rdfjs.Quad> {
     graph?: rdfjs.Term | null,
   ): D1QuadStream {
     return new D1QuadStream(() =>
-      removeMatchedQuads(this, subject, predicate, object, graph)
+      removeMatchedQuads(this, subject, predicate, object, graph),
     );
   }
 
   /** deleteGraph removes every quad in the named graph. */
-  public deleteGraph(
-    graph: rdfjs.Quad_Graph | string,
-  ): D1QuadStream {
-    const graphTerm = typeof graph === "string"
-      ? DataFactory.namedNode(graph)
-      : graph;
+  public deleteGraph(graph: rdfjs.Quad_Graph | string): D1QuadStream {
+    const graphTerm =
+      typeof graph === "string" ? DataFactory.namedNode(graph) : graph;
     return this.removeMatches(null, null, null, graphTerm);
   }
 

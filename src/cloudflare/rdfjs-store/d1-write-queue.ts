@@ -36,14 +36,15 @@ export class D1WriteQueue {
       if (failures.length === 0) return;
       const capped = failures.slice(0, MAX_REPORTED_FAILURES);
       const suppressed = failures.length - capped.length;
-      const errors = suppressed > 0
-        ? [
-          ...capped,
-          new Error(
-            `${suppressed} more write failure(s) suppressed; see the logged errors`,
-          ),
-        ]
-        : capped;
+      const errors =
+        suppressed > 0
+          ? [
+              ...capped,
+              new Error(
+                `${suppressed} more write failure(s) suppressed; see the logged errors`,
+              ),
+            ]
+          : capped;
       throw new AggregateError(
         errors,
         `${failures.length} queued write(s) failed`,

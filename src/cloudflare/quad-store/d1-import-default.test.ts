@@ -25,14 +25,12 @@ class CountingEmbedder implements EmbeddingService {
 }
 
 const facts = (prefix: string, n: number) =>
-  Array.from(
-    { length: n },
-    (_, i) =>
-      quad(
-        namedNode(`urn:imp:${prefix}:${i}`),
-        namedNode("urn:imp:p"),
-        literal(`${prefix} fact ${i}`),
-      ),
+  Array.from({ length: n }, (_, i) =>
+    quad(
+      namedNode(`urn:imp:${prefix}:${i}`),
+      namedNode("urn:imp:p"),
+      literal(`${prefix} fact ${i}`),
+    ),
   );
 
 /** setup builds a D1 store that leaves `searchIndexOnImport` unset, so the default applies. */

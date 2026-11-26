@@ -19,9 +19,11 @@ import {
   type VectorizeMetadataIndexObservation,
 } from "../src/cloudflare/search-index/vector-search/vectorize-provisioning.ts";
 
-function wrangler(
-  args: string[],
-): { ok: boolean; stdout: string; stderr: string } {
+function wrangler(args: string[]): {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+} {
   // npx is a .cmd shim on Windows, which only a shell can launch.
   const out = spawnSync("npx", ["wrangler", ...args], {
     encoding: "utf8",
@@ -64,12 +66,7 @@ let index: VectorizeIndexObservation | undefined;
 let metadataIndexes: VectorizeMetadataIndexObservation[] = [];
 if (got.ok) {
   index = parseJson<VectorizeIndexObservation>(got.stdout);
-  const listed = wrangler([
-    "vectorize",
-    "list-metadata-index",
-    name,
-    "--json",
-  ]);
+  const listed = wrangler(["vectorize", "list-metadata-index", name, "--json"]);
   if (!listed.ok) {
     console.error(listed.stderr || listed.stdout);
     process.exit(1);

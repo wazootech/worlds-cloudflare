@@ -87,15 +87,17 @@ export async function createCloudflareWorldsSdk(
 
   await d1RdfjsStore.ensureSchema();
 
-  const textSplitter = options.textSplitter ??
+  const textSplitter =
+    options.textSplitter ??
     new RecursiveCharacterTextSplitter({ chunkSize: 1000 });
 
-  const vectorSearch = options.vectorize && options.worldId
-    ? new VectorizeVectorSearchIndex({
-      index: options.vectorize,
-      worldId: options.worldId,
-    })
-    : undefined;
+  const vectorSearch =
+    options.vectorize && options.worldId
+      ? new VectorizeVectorSearchIndex({
+          index: options.vectorize,
+          worldId: options.worldId,
+        })
+      : undefined;
 
   const searchIndexProjector = new D1SearchIndexProjector({
     ...options,

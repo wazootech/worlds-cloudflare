@@ -23,8 +23,7 @@ export interface RebuildD1SearchIndexFromQuadsResult {
   vectorSync: VectorSyncReport;
 }
 
-export interface ReadProjectSearchChunksOptions
-  extends ProjectSearchChunksOptions {
+export interface ReadProjectSearchChunksOptions extends ProjectSearchChunksOptions {
   readPageSize?: number;
 }
 

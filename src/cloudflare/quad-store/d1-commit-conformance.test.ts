@@ -104,7 +104,8 @@ export function failingD1(database: D1DatabaseLike): FailingD1 {
     database: {
       prepare: (sql) => {
         if (
-          sql.includes("ORDER BY quad_id ASC") && !sql.includes("quad_id >")
+          sql.includes("ORDER BY quad_id ASC") &&
+          !sql.includes("quad_id >")
         ) {
           rebuilds++;
         }
@@ -135,7 +136,7 @@ export function failingD1(database: D1DatabaseLike): FailingD1 {
             };
             return database.batch(
               tagged.map((s, i) =>
-                i === at ? database.prepare(POISON) : s.inner
+                i === at ? database.prepare(POISON) : s.inner,
               ),
             );
           }
@@ -187,7 +188,8 @@ export async function createD1Subject(
   });
   return {
     commit: async (patch: Patch, context?: TransactionContext) => {
-      await quadStore.createTransaction()
+      await quadStore
+        .createTransaction()
         .addQuads(patch.insertions ?? [])
         .removeQuads(patch.deletions ?? [])
         .commit(context);
@@ -251,8 +253,8 @@ async function runSuite(
       [],
     );
     assert.ok(
-      report.results.some((r) =>
-        r.name === "later-write failure follows the contract" && r.ok
+      report.results.some(
+        (r) => r.name === "later-write failure follows the contract" && r.ok,
       ),
       "the later-write case must run and pass",
     );
@@ -298,13 +300,17 @@ test("D1 satisfies the shared commit conformance suite on the chunked fallback p
 
 test("D1 satisfies the shared commit conformance suite on the byte-budget chunked path", async () => {
   // A 1-byte budget puts every statement alone in its own batch.
-  await runSuite(undefined, {
-    atomic: false,
-    embeddingFailure: "throws",
-    replaceImportFailure: "empties-graph",
-    defaultSearchIndexOnImport: "incremental",
-    laterWriteFailure: "restores-prior-state",
-  }, 1);
+  await runSuite(
+    undefined,
+    {
+      atomic: false,
+      embeddingFailure: "throws",
+      replaceImportFailure: "empties-graph",
+      defaultSearchIndexOnImport: "incremental",
+      laterWriteFailure: "restores-prior-state",
+    },
+    1,
+  );
 });
 
 const { namedNode, literal, quad } = DataFactory;
@@ -340,13 +346,11 @@ test("a failed write after the first batch removes the novel quads and their chu
   }
 });
 
-for (
-  const [name, size, weight] of [
-    ["atomic batch", undefined, undefined],
-    ["chunked batches", 1, undefined],
-    ["byte-budget batches", undefined, 1],
-  ] as const
-) {
+for (const [name, size, weight] of [
+  ["atomic batch", undefined, undefined],
+  ["chunked batches", 1, undefined],
+  ["byte-budget batches", undefined, 1],
+] as const) {
   test(`the later-write failure follows the quad writes (${name})`, async () => {
     const subject = await createD1Subject({
       searchIndexOnImport: "incremental",
@@ -357,21 +361,22 @@ for (
     try {
       subject.failLaterWrite();
       await rejected(() =>
-        subject.commit({ insertions: [one, two], deletions: [] })
+        subject.commit({ insertions: [one, two], deletions: [] }),
       );
       const failure = subject.laterFailure();
       assert.ok(failure, "the armed failure must fire");
-      const quadWrites = failure.statements.map((sql, index) => ({
-        sql,
-        index,
-      }))
+      const quadWrites = failure.statements
+        .map((sql, index) => ({
+          sql,
+          index,
+        }))
         .filter(({ sql }) => sql.includes(" INTO quads "));
       assert.ok(quadWrites.length > 0, "the commit must write quads");
       assert.ok(
         quadWrites.every(({ index }) => index < failure.failedAt),
-        `every quad insert must precede the failing write: ${
-          JSON.stringify(failure)
-        }`,
+        `every quad insert must precede the failing write: ${JSON.stringify(
+          failure,
+        )}`,
       );
       assert.deepStrictEqual(await subject.storedQuads(), []);
       assert.deepStrictEqual(await subject.chunkedQuadIds(), []);

@@ -58,20 +58,16 @@ export function createD1CommitDialect(
   const { worldId, lookupChunkSize, searchQueryBuilder, derived } = options;
   let derivedPending = derived;
   const deleteChunks = (ids: readonly string[]) =>
-    chunked(
-      ids,
-      lookupChunkSize,
-      (chunk) => searchQueryBuilder.buildDeleteByQuadIds(chunk),
+    chunked(ids, lookupChunkSize, (chunk) =>
+      searchQueryBuilder.buildDeleteByQuadIds(chunk),
     );
   const takeDerivedStatements = (): D1Statement[] => {
     const changes = derivedPending;
     derivedPending = undefined;
     if (!changes) return [];
     return [
-      ...chunked(
-        changes.removeIds,
-        lookupChunkSize,
-        (chunk) => buildDeleteDerivedQuadsByQuadIds(chunk, worldId),
+      ...chunked(changes.removeIds, lookupChunkSize, (chunk) =>
+        buildDeleteDerivedQuadsByQuadIds(chunk, worldId),
       ),
       // OR IGNORE: a quad that is asserted (now or already) stays asserted.
       ...buildBulkInsertQuads(changes.addRows, { orIgnore: true }),
@@ -85,19 +81,19 @@ export function createD1CommitDialect(
     buildClearChunks: () => [searchQueryBuilder.buildClearChunks()],
     buildDeleteChunks: deleteChunks,
     buildDeletions: (keys) => [
-      ...chunked(
-        keys,
-        lookupChunkSize,
-        (chunk) => buildDeleteQuadsByQuadIds(chunk, worldId),
+      ...chunked(keys, lookupChunkSize, (chunk) =>
+        buildDeleteQuadsByQuadIds(chunk, worldId),
       ),
       ...takeDerivedStatements(),
     ],
     buildInserts: (quads, _keys, hashes) =>
-      buildBulkInsertQuads(quads.map((quad, index) => ({
-        ...buildInsertRow(quad, hashes[index]!),
-        world_id: worldId,
-        ...(derived && { derived: 0 as const }),
-      }))),
+      buildBulkInsertQuads(
+        quads.map((quad, index) => ({
+          ...buildInsertRow(quad, hashes[index]!),
+          world_id: worldId,
+          ...(derived && { derived: 0 as const }),
+        })),
+      ),
     buildChunkRows: (rows) => {
       options.onChunkRows?.(rows);
       return [
@@ -112,15 +108,13 @@ export function createD1CommitDialect(
             fts_value: ftsValue,
             vector: vector ? new Float32Array(vector) : undefined,
             world_id: worldId,
-          })
+          }),
         ),
       ];
     },
     buildCleanup: (keys) => [
-      ...chunked(
-        keys,
-        lookupChunkSize,
-        (chunk) => buildDeleteQuadsByQuadIds(chunk, worldId),
+      ...chunked(keys, lookupChunkSize, (chunk) =>
+        buildDeleteQuadsByQuadIds(chunk, worldId),
       ),
       ...deleteChunks(keys),
     ],

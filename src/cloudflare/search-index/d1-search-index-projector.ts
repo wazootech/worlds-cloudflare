@@ -10,8 +10,7 @@ import type { VectorSyncReport } from "./vector-sync-report.ts";
 
 export type { ProjectSearchChunksOptions } from "./project-search-chunks-options.ts";
 
-export interface D1SearchIndexProjectorOptions
-  extends ProjectSearchChunksOptions {
+export interface D1SearchIndexProjectorOptions extends ProjectSearchChunksOptions {
   // Currently, options are exactly ProjectSearchChunksOptions.
 }
 
@@ -21,9 +20,7 @@ export interface D1SearchIndexProjectorOptions
  * sync, and the full rebuild. The commit itself runs in `commitD1Patch`.
  */
 export class D1SearchIndexProjector {
-  public constructor(
-    private readonly options: D1SearchIndexProjectorOptions,
-  ) {}
+  public constructor(private readonly options: D1SearchIndexProjectorOptions) {}
 
   /** projection is the shared core's chunking and embedding configuration. */
   public get projection(): SqlProjectionOptions {

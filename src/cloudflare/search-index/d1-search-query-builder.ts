@@ -44,9 +44,9 @@ export class D1SearchQueryBuilder {
       dimensions > D1_SEARCH_QUERY_BUILDER_MAX_VECTOR_DIMENSIONS
     ) {
       throw new Error(
-        `vectorDimensions must be a finite integer in [1, ${D1_SEARCH_QUERY_BUILDER_MAX_VECTOR_DIMENSIONS}], received: ${
-          String(vectorDimensions)
-        }`,
+        `vectorDimensions must be a finite integer in [1, ${D1_SEARCH_QUERY_BUILDER_MAX_VECTOR_DIMENSIONS}], received: ${String(
+          vectorDimensions,
+        )}`,
       );
     }
     this.vectorDimensions = dimensions;
@@ -78,10 +78,9 @@ export class D1SearchQueryBuilder {
     }
     if (this.worldId) args.push(insertOptions.world_id ?? this.worldId);
     return {
-      sql:
-        `INSERT INTO chunks (quad_id, subject, predicate, graph, value, fts_value, vector${
-          this.worldId ? ", world_id" : ""
-        })
+      sql: `INSERT INTO chunks (quad_id, subject, predicate, graph, value, fts_value, vector${
+        this.worldId ? ", world_id" : ""
+      })
           VALUES (?, ?, ?, ?, ?, ?, ?${this.worldId ? ", ?" : ""})`,
       args,
     };
@@ -94,9 +93,7 @@ export class D1SearchQueryBuilder {
       : { sql: "DELETE FROM chunks", args: [] };
   }
 
-  public buildDeleteByQuadIds(
-    quadIds: string[],
-  ): SqlStatement {
+  public buildDeleteByQuadIds(quadIds: string[]): SqlStatement {
     const placeholders = generatePlaceholders(quadIds.length);
     return {
       sql: `DELETE FROM chunks WHERE quad_id IN (${placeholders})${
@@ -112,15 +109,12 @@ export class D1SearchQueryBuilder {
    * the given quads — used by the projector to delete stale vectors from the
    * outside-D1 vector index before refreshing chunk rows.
    */
-  public buildChunkVectorLookupByQuadIds(
-    quadIds: string[],
-  ): SqlStatement {
+  public buildChunkVectorLookupByQuadIds(quadIds: string[]): SqlStatement {
     const placeholders = generatePlaceholders(quadIds.length);
     return {
-      sql:
-        `SELECT quad_id, subject, predicate, graph, value FROM chunks WHERE quad_id IN (${placeholders})${
-          this.worldId ? " AND world_id = ?" : ""
-        }`,
+      sql: `SELECT quad_id, subject, predicate, graph, value FROM chunks WHERE quad_id IN (${placeholders})${
+        this.worldId ? " AND world_id = ?" : ""
+      }`,
       args: this.worldId ? [...quadIds, this.worldId] : quadIds,
     };
   }

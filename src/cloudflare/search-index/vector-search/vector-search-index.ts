@@ -71,9 +71,9 @@ export interface VectorizeIndexLike {
    * already mandates one on `world_id`). Optional so older bindings and test
    * doubles stay structurally assignable.
    */
-  deleteByMetadataFilter?(
-    filter: { filter: Record<string, string> },
-  ): Promise<unknown>;
+  deleteByMetadataFilter?(filter: {
+    filter: Record<string, string>;
+  }): Promise<unknown>;
 }
 
 /**

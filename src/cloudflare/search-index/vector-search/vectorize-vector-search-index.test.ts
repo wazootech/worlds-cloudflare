@@ -21,9 +21,9 @@ class InMemoryVectorize implements VectorizeIndexLike {
   ) {
     const matches = [...this.vectors.entries()]
       .filter(([, vector]) =>
-        Object.entries(options?.filter ?? {}).every(([key, value]) =>
-          vector.metadata[key] === value
-        )
+        Object.entries(options?.filter ?? {}).every(
+          ([key, value]) => vector.metadata[key] === value,
+        ),
       )
       .slice(0, options?.topK ?? 10)
       .map(([id, vector]) => ({ id, score: 0.9, metadata: vector.metadata }));
@@ -31,9 +31,11 @@ class InMemoryVectorize implements VectorizeIndexLike {
   }
 
   public upsert(
-    vectors: Array<
-      { id: string; values: number[]; metadata?: Record<string, string> }
-    >,
+    vectors: Array<{
+      id: string;
+      values: number[];
+      metadata?: Record<string, string>;
+    }>,
   ) {
     for (const vector of vectors) {
       this.vectors.set(vector.id, {
@@ -105,7 +107,10 @@ test("identical triple text in two worlds does not collide", async () => {
     "B's delete leaves A's vector alone",
   );
   const hits = await a.query([0.1, 0.2], { topK: 5 });
-  assert.deepStrictEqual(hits.map((hit) => hit.id), [RESULT_ID]);
+  assert.deepStrictEqual(
+    hits.map((hit) => hit.id),
+    [RESULT_ID],
+  );
 });
 
 test("queries are always world-scoped and return contract ids", async () => {

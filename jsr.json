@@ -21,14 +21,7 @@
     "miniflare": "npm:miniflare@^4.20260730.0"
   },
   "publish": {
-    "include": [
-      "src/",
-      "README.md",
-      "LICENSE"
-    ],
-    "exclude": [
-      "src/**/*.test.ts",
-      "test/"
-    ]
+    "include": ["src/", "README.md", "LICENSE"],
+    "exclude": ["src/**/*.test.ts", "test/"]
   }
 }

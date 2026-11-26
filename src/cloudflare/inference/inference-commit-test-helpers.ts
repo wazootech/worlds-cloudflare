@@ -20,9 +20,13 @@ export async function setup(inference?: InferenceOptions, worldId?: string) {
     await sdk.sparql({ query: `${PREFIX}${body}` });
   };
   const rows = async () => {
-    const result = await substrate.connection.execute<
-      { s: string; p: string; o: string; g: string; derived: number }
-    >({
+    const result = await substrate.connection.execute<{
+      s: string;
+      p: string;
+      o: string;
+      g: string;
+      derived: number;
+    }>({
       sql: "SELECT s, p, o, g, derived FROM quads ORDER BY s, p, o, g",
     });
     return result.rows.map((r) => [

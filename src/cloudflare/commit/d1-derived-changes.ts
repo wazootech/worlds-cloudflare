@@ -36,8 +36,8 @@ export async function planD1DerivedChanges(
   driverOptions: D1CommitDriverOptions,
 ): Promise<D1DerivedChanges> {
   const prepared = preparePatch(patch, driverOptions);
-  const maxAssertedQuads = inference.maxAssertedQuads ??
-    DEFAULT_MAX_ASSERTED_QUADS;
+  const maxAssertedQuads =
+    inference.maxAssertedQuads ?? DEFAULT_MAX_ASSERTED_QUADS;
   const replacing = isReplaceImportCommit(context);
   if (replacing && prepared.insertions.length > maxAssertedQuads) {
     throw new InferenceSizeGuardError(
@@ -46,14 +46,13 @@ export async function planD1DerivedChanges(
     );
   }
   const plan = planInference({
-    assertedBefore: replacing ? [] : await loadAssertedQuads(
-      driverOptions.connection,
-      {
-        worldId: driverOptions.worldId,
-        maxAssertedQuads,
-        pendingInsertions: prepared.insertions.length,
-      },
-    ),
+    assertedBefore: replacing
+      ? []
+      : await loadAssertedQuads(driverOptions.connection, {
+          worldId: driverOptions.worldId,
+          maxAssertedQuads,
+          pendingInsertions: prepared.insertions.length,
+        }),
     deletions: prepared.deletions,
     insertions: prepared.insertions,
     graphs: inference.graphs,

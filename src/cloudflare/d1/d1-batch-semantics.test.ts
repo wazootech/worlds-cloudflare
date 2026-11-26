@@ -42,7 +42,7 @@ test("a batch rolls back every statement when one fails", () =>
   withTable(async (substrate) => {
     await substrate.connection.batch([insert(1), insert(2)]);
     await rejected(() =>
-      substrate.connection.batch([insert(3), insert(4), insert(1)])
+      substrate.connection.batch([insert(3), insert(4), insert(1)]),
     );
     assert.deepStrictEqual(
       await count(substrate),

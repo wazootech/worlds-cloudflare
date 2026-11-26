@@ -63,7 +63,8 @@ test("a 1,536-dim chunk statement estimates 18-40 KB, a 384-dim one 4.5-10 KB", 
 test("2,000 heavy chunk statements exceed the default budget; 2,000 mixed 384-dim ones do not", () => {
   const heavy = 2000 * d1StatementWeight(chunkStatement(1536));
   assert.ok(heavy > DEFAULT_D1_MAX_BATCH_WEIGHT, `heavy: ${heavy}`);
-  const mixed384 = 1000 * d1StatementWeight(chunkStatement(384)) +
+  const mixed384 =
+    1000 * d1StatementWeight(chunkStatement(384)) +
     1000 * d1StatementWeight(quadStatement());
   assert.ok(mixed384 < DEFAULT_D1_MAX_BATCH_WEIGHT, `mixed 384: ${mixed384}`);
 });

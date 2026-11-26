@@ -56,15 +56,16 @@ test("D1 schema compatibility reports missing tables and columns", async () => {
       true,
     );
     assert.deepStrictEqual(
-      partial.issues.some((issue) =>
-        issue.detail === "missing column world_id"
+      partial.issues.some(
+        (issue) => issue.detail === "missing column world_id",
       ),
       true,
     );
     assert.deepStrictEqual(
-      partial.issues.some((issue) =>
-        issue.detail ===
-          "expected primary key quad_id or quad_id + world_id, found id"
+      partial.issues.some(
+        (issue) =>
+          issue.detail ===
+          "expected primary key quad_id or quad_id + world_id, found id",
       ),
       true,
     );
@@ -87,12 +88,10 @@ test("D1 schema compatibility rejects an unexpected schema version", async () =>
       await substrate.connection.execute({ sql: ddl });
     }
     await substrate.connection.execute({
-      sql:
-        "CREATE TABLE worlds_data_plane_schema (schema_version_id INTEGER PRIMARY KEY, version INTEGER NOT NULL UNIQUE, applied_at TEXT NOT NULL)",
+      sql: "CREATE TABLE worlds_data_plane_schema (schema_version_id INTEGER PRIMARY KEY, version INTEGER NOT NULL UNIQUE, applied_at TEXT NOT NULL)",
     });
     await substrate.connection.execute({
-      sql:
-        "INSERT INTO worlds_data_plane_schema (version, applied_at) VALUES (99, datetime('now'))",
+      sql: "INSERT INTO worlds_data_plane_schema (version, applied_at) VALUES (99, datetime('now'))",
     });
 
     const report = await checkD1SchemaCompatibility(substrate.connection, {
@@ -100,8 +99,8 @@ test("D1 schema compatibility rejects an unexpected schema version", async () =>
     });
     assert.deepStrictEqual(report.compatible, false);
     assert.deepStrictEqual(
-      report.issues.some((issue) =>
-        issue.detail === "expected schema version 4, found 99"
+      report.issues.some(
+        (issue) => issue.detail === "expected schema version 4, found 99",
       ),
       true,
     );
@@ -163,8 +162,7 @@ test("ensureSchema does not stamp an incompatible schema", async () => {
     );
 
     const stamped = await substrate.connection.execute<{ count: number }>({
-      sql:
-        "SELECT COUNT(*) AS count FROM worlds_data_plane_schema WHERE version = ?",
+      sql: "SELECT COUNT(*) AS count FROM worlds_data_plane_schema WHERE version = ?",
       args: [4],
     });
     assert.deepStrictEqual(Number(stamped.rows[0]?.count), 0);
@@ -193,8 +191,7 @@ test("ensureSchema stamps the canonical version once verification passes", async
     });
 
     const stamped = await substrate.connection.execute<{ count: number }>({
-      sql:
-        "SELECT COUNT(*) AS count FROM worlds_data_plane_schema WHERE version = ?",
+      sql: "SELECT COUNT(*) AS count FROM worlds_data_plane_schema WHERE version = ?",
       args: [4],
     });
     assert.deepStrictEqual(Number(stamped.rows[0]?.count), 1);

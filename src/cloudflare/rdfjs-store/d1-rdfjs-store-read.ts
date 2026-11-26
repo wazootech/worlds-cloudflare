@@ -69,12 +69,15 @@ export async function countD1Matches(
   object?: rdfjs.Term | null,
   graph?: rdfjs.Term | null,
 ): Promise<number> {
-  const { sql, args } = buildCountQuadsQuery({
-    subject: subject ?? null,
-    predicate: predicate ?? null,
-    object: object ?? null,
-    graph: graph ?? null,
-  }, worldId);
+  const { sql, args } = buildCountQuadsQuery(
+    {
+      subject: subject ?? null,
+      predicate: predicate ?? null,
+      object: object ?? null,
+      graph: graph ?? null,
+    },
+    worldId,
+  );
   const result = await connection.execute<{ count: number }>({
     sql,
     args,
@@ -90,9 +93,10 @@ export interface PatchingQuadStore {
     object?: rdfjs.Term | null,
     graph?: rdfjs.Term | null,
   ): Promise<rdfjs.Quad[]>;
-  applyPatch(
-    patch: { insertions: rdfjs.Quad[]; deletions: rdfjs.Quad[] },
-  ): Promise<void>;
+  applyPatch(patch: {
+    insertions: rdfjs.Quad[];
+    deletions: rdfjs.Quad[];
+  }): Promise<void>;
 }
 
 /** removeMatchedQuads deletes every matching quad in one patch and yields the removed quads. */

@@ -131,8 +131,7 @@ test("d1 reindex - unscoped reindex drops the stale chunk row of a deleted quad"
   const ctx = await fixture();
   try {
     await ctx.connection.execute({
-      sql:
-        "INSERT INTO chunks (quad_id, subject, predicate, graph, value, fts_value) VALUES ('gone', 's', 'p', 'g', 'ghost', 'ghost')",
+      sql: "INSERT INTO chunks (quad_id, subject, predicate, graph, value, fts_value) VALUES ('gone', 's', 'p', 'g', 'ghost', 'ghost')",
       args: [],
     });
     assert.deepStrictEqual(await count(ctx), 5);

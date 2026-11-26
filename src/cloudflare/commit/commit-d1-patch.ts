@@ -34,11 +34,11 @@ export async function commitD1Patch(
   };
   const derived = options.inference?.enabled
     ? await planD1DerivedChanges(
-      patch,
-      context,
-      options.inference,
-      driverOptions,
-    )
+        patch,
+        context,
+        options.inference,
+        driverOptions,
+      )
     : undefined;
   const indexing = planSearchIndexing(options.searchIndexOnImport, context);
   await commitSqlPatch(

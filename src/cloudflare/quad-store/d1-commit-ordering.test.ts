@@ -22,7 +22,9 @@ function embedder(length: number, calls: string[][]): EmbeddingService {
   return {
     embed: (texts) => {
       calls.push([...texts]);
-      return Promise.resolve(texts.map(() => Array.from({ length }, () => 0.5)));
+      return Promise.resolve(
+        texts.map(() => Array.from({ length }, () => 0.5)),
+      );
     },
   };
 }
@@ -39,7 +41,8 @@ async function setup(options: {
   const projector = new D1SearchIndexProjector({
     connection: substrate.connection,
     searchQueryBuilder,
-    textSplitter: options.textSplitter ??
+    textSplitter:
+      options.textSplitter ??
       new RecursiveCharacterTextSplitter({ chunkSize: 1000 }),
     embeddingService: options.embeddingService,
     vectorSearch,
@@ -54,9 +57,11 @@ async function setup(options: {
   });
   const chunkCount = async () =>
     Number(
-      (await substrate.connection.execute({
-        sql: "SELECT COUNT(*) AS n FROM chunks",
-      })).rows[0]!.n,
+      (
+        await substrate.connection.execute({
+          sql: "SELECT COUNT(*) AS n FROM chunks",
+        })
+      ).rows[0]!.n,
     );
   return { substrate, store, quadStore, vectorSearch, chunkCount };
 }

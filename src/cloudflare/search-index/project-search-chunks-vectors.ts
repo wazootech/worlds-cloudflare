@@ -71,9 +71,7 @@ export async function deleteStaleVectors(
     const ids: string[] = [];
     try {
       const resultSet = await options.connection.execute(
-        options.searchQueryBuilder.buildChunkVectorLookupByQuadIds(
-          quadIdBatch,
-        ),
+        options.searchQueryBuilder.buildChunkVectorLookupByQuadIds(quadIdBatch),
       );
       for (const row of resultSet.rows) {
         ids.push(

@@ -4,9 +4,10 @@ import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 
 export const { namedNode, literal, blankNode } = DataFactory;
 
-export async function createTestD1Store(): Promise<
-  { store: D1RdfjsStore; dispose(): Promise<void> }
-> {
+export async function createTestD1Store(): Promise<{
+  store: D1RdfjsStore;
+  dispose(): Promise<void>;
+}> {
   const substrate = await createTestD1();
   const store = new D1RdfjsStore({ connection: substrate.connection });
   await store.ensureSchema();

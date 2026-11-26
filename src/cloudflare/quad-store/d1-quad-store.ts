@@ -47,9 +47,7 @@ export interface D1QuadStoreOptions extends D1ClientBaseOptions {
  * It encapsulates transaction routing, commits, and indexing synchronization.
  */
 export class D1QuadStore implements QuadStoreInterface {
-  public constructor(
-    private readonly options: D1QuadStoreOptions,
-  ) {}
+  public constructor(private readonly options: D1QuadStoreOptions) {}
 
   /**
    * import merges or replaces the underlying store with provided RDF source data.
