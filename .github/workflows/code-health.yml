@@ -27,7 +27,7 @@ jobs:
           #   d1-quad-stream.ts: EventEmitter-surface shim; the typed overloads and
           #     listener bookkeeping are one cohesive unit (203 lines).
           #   d1-rdfjs-store.ts: the RDF/JS Store facade; its mandated four-argument
-          #     method signatures dominate the count (164 lines).
+          #     method signatures dominate the count (179 lines after bun fmt).
           allow='^src/cloudflare/rdfjs-store/(d1-quad-stream|d1-rdfjs-store)\.ts$'
           git ls-files '*.ts' '*.tsx' '*.js' '*.mjs' \
             | grep -vE '(^|/)(node_modules|dist|generated|fixtures|\.next)/|\.d\.ts$|\.gen\.|openapi|snapshot|schema' \
