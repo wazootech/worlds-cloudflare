@@ -1,4 +1,7 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { readFile } from "node:fs/promises";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected } from "../../../test/thrown.ts";
 import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 import { D1SchemaBuilder } from "./d1-schema-builder.ts";
 import { checkD1SchemaCompatibility } from "./d1-schema-compatibility.ts";
@@ -29,7 +32,7 @@ function row(id: string, derived?: 0 | 1): InsertQuadRow {
   };
 }
 
-Deno.test("fresh quads table has derived defaulting to 0 and passes the derived check", async () => {
+test("fresh quads table has derived defaulting to 0 and passes the derived check", async () => {
   const substrate = await createTestD1();
   try {
     const store = new D1RdfjsStore({
@@ -40,74 +43,76 @@ Deno.test("fresh quads table has derived defaulting to 0 and passes the derived 
     const report = await checkD1SchemaCompatibility(substrate.connection, {
       requireDerivedColumn: true,
     });
-    assertEquals(report.compatible, true);
+    assert.deepStrictEqual(report.compatible, true);
     for (const statement of buildBulkInsertQuads([row("a")])) {
       await substrate.connection.execute(statement);
     }
     const stored = await substrate.connection.execute<{ derived: number }>({
       sql: "SELECT derived FROM quads WHERE quad_id = 'a'",
     });
-    assertEquals(Number(stored.rows[0]?.derived), 0);
+    assert.deepStrictEqual(Number(stored.rows[0]?.derived), 0);
   } finally {
     await substrate.dispose();
   }
 });
 
-Deno.test("a pre-derived database fails the derived check until the migration runs", async () => {
+test("a pre-derived database fails the derived check until the migration runs", async () => {
   const substrate = await createTestD1();
   try {
     // The canonical DDL as it was before this column existed.
-    const legacyQuads = new D1SchemaBuilder(32).buildD1QuadsTable().replace(
-      ", derived INTEGER NOT NULL DEFAULT 0",
-      "",
-    );
+    const legacyQuads = new D1SchemaBuilder(32)
+      .buildD1QuadsTable()
+      .replace(", derived INTEGER NOT NULL DEFAULT 0", "");
     await substrate.connection.execute({ sql: legacyQuads });
     await substrate.connection.execute({
-      sql: "INSERT INTO quads (quad_id, s, s_type, p, o, o_type, g, g_type) " +
+      sql:
+        "INSERT INTO quads (quad_id, s, s_type, p, o, o_type, g, g_type) " +
         "VALUES ('old', 's', 'NamedNode', 'p', 'o', 'NamedNode', '', 'DefaultGraph')",
     });
 
     const before = await checkD1SchemaCompatibility(substrate.connection, {
       requireDerivedColumn: true,
     });
-    assertEquals(
+    assert.deepStrictEqual(
       before.issues.some((issue) => issue.detail === "missing column derived"),
       true,
     );
     // Without opting in, the missing column is not reported.
     const optedOut = await checkD1SchemaCompatibility(substrate.connection);
-    assertEquals(
+    assert.deepStrictEqual(
       optedOut.issues.some((issue) => issue.detail.includes("derived")),
       false,
     );
 
-    const sql = (await Deno.readTextFile(MIGRATION)).split("\n")
-      .filter((line) => !line.startsWith("--")).join("\n").trim();
+    const sql = (await readFile(MIGRATION, "utf8"))
+      .split("\n")
+      .filter((line) => !line.startsWith("--"))
+      .join("\n")
+      .trim();
     await substrate.connection.execute({ sql });
 
     const after = await checkD1SchemaCompatibility(substrate.connection, {
       requireDerivedColumn: true,
     });
-    assertEquals(
+    assert.deepStrictEqual(
       after.issues.some((issue) => issue.detail.includes("derived")),
       false,
     );
     const migrated = await substrate.connection.execute<{ derived: number }>({
       sql: "SELECT derived FROM quads WHERE quad_id = 'old'",
     });
-    assertEquals(Number(migrated.rows[0]?.derived), 0);
+    assert.deepStrictEqual(Number(migrated.rows[0]?.derived), 0);
 
-    await assertRejects(() => substrate.connection.execute({ sql }));
+    await rejected(() => substrate.connection.execute({ sql }));
   } finally {
     await substrate.dispose();
   }
 });
 
-Deno.test("inferred rows never overwrite or delete asserted rows", async () => {
+test("inferred rows never overwrite or delete asserted rows", async () => {
   const substrate = await createTestD1();
   try {
-    await new D1RdfjsStore({ connection: substrate.connection })
-      .ensureSchema();
+    await new D1RdfjsStore({ connection: substrate.connection }).ensureSchema();
     const run = async (
       statements: Array<{ sql: string; args?: unknown[] }>,
     ) => {
@@ -124,12 +129,14 @@ Deno.test("inferred rows never overwrite or delete asserted rows", async () => {
     );
     // Deleting both ids as derived only removes the inferred one.
     await run([buildDeleteDerivedQuadsByQuadIds(["asserted", "inferred"])]);
-    const left = await substrate.connection.execute<
-      { quad_id: string; derived: number }
-    >({ sql: "SELECT quad_id, derived FROM quads ORDER BY quad_id" });
-    assertEquals(left.rows.map((r) => [r.quad_id, Number(r.derived)]), [
-      ["asserted", 0],
-    ]);
+    const left = await substrate.connection.execute<{
+      quad_id: string;
+      derived: number;
+    }>({ sql: "SELECT quad_id, derived FROM quads ORDER BY quad_id" });
+    assert.deepStrictEqual(
+      left.rows.map((r) => [r.quad_id, Number(r.derived)]),
+      [["asserted", 0]],
+    );
 
     // Replacing an inferred row with an asserted one promotes it.
     await run(buildBulkInsertQuads([row("promoted", 1)]));
@@ -137,7 +144,7 @@ Deno.test("inferred rows never overwrite or delete asserted rows", async () => {
     const promoted = await substrate.connection.execute<{ derived: number }>({
       sql: "SELECT derived FROM quads WHERE quad_id = 'promoted'",
     });
-    assertEquals(Number(promoted.rows[0]?.derived), 0);
+    assert.deepStrictEqual(Number(promoted.rows[0]?.derived), 0);
 
     // assertedOnly existence ignores inferred rows.
     await run(buildBulkInsertQuads([row("inf2", 1)]));
@@ -146,7 +153,10 @@ Deno.test("inferred rows never overwrite or delete asserted rows", async () => {
         assertedOnly: true,
       }),
     );
-    assertEquals(existing.rows.map((r) => r.id), ["asserted"]);
+    assert.deepStrictEqual(
+      existing.rows.map((r) => r.id),
+      ["asserted"],
+    );
   } finally {
     await substrate.dispose();
   }

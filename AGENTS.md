@@ -6,13 +6,25 @@ Family-wide rules live in the
 [wazootech workspace constitution](https://github.com/wazootech/workspace/blob/main/AGENTS.md#code-health-standards);
 this repo's specifics:
 
-- Before pushing, run `deno task ci` (fmt check, lint, type check, tests).
-- Deno type checking is strict by default; do not weaken it.
-- The single `deno-lint-ignore no-explicit-any` in
-  `src/cloudflare/rdfjs-store/d1-quad-stream.ts` covers a commented EventEmitter
-  listener type; keep its explanatory comment and add no new `any` without one.
-- Actions in `.github/workflows/` are pinned to full commit SHAs, CI pins Deno
-  to `v2.9.8`, and installs are frozen (`deno ci`).
+- Before pushing, run `bun run ci` (format check, lint, type check, manifest
+  check, tests). The toolchain is Bun: `bun fmt --no-script`, Oxlint
+  (`oxlint --deny-warnings`, `.oxlintrc.json`), `bun check --no-script`
+  (`tsc`), `bun test`. Code and tests are Node-compatible (`node:test`,
+  `node:assert/strict`, `node:*` APIs); the suite also passed on Deno before the
+  cutover (#104), but nothing in CI runs it there now.
+- Install with `bun install --frozen-lockfile --ignore-scripts`. `jsr.json` is
+  the published manifest and `package.json` mirrors it for Bun;
+  `bun run check:manifests` fails on drift.
+- Type checking is strict; do not weaken it.
+- The single `typescript/no-explicit-any` override for
+  `src/cloudflare/rdfjs-store/d1-quad-stream.ts` in `.oxlintrc.json` covers a
+  commented EventEmitter listener type; keep its explanatory comment and add no
+  new `any` without one.
+- Tests run on miniflare (D1 and Vectorize emulation); never point them or
+  `scripts/verify-vectorize.ts` at a real Cloudflare account from CI.
+- Actions in `.github/workflows/` are pinned to full commit SHAs. Bun is the
+  one toolchain that floats (`bun-version: "1.x"`, owner decision in
+  wazootech/workspace#50); installs are frozen (`bun install --frozen-lockfile`).
 - `secret-scan.yml` runs gitleaks on every PR and push to `main`; report
   findings, never suppress them.
 - `code-health.yml` enforces the file-length limit (120 lines of code per source

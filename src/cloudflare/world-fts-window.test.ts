@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { createCloudflareWorldsSdk } from "./create-cloudflare-sdk.ts";
 import { createTestD1 } from "./d1-test-substrate.ts";
 
@@ -11,7 +12,7 @@ const lines = (count: number, text: (i: number) => string) =>
     (_, i) => `<urn:s${i}> <urn:p> "${text(i)}" .\n`,
   ).join("");
 
-Deno.test("one world's dense matches cannot crowd out another world's FTS candidates", async () => {
+test("one world's dense matches cannot crowd out another world's FTS candidates", async () => {
   const substrate = await createTestD1();
   try {
     const open = (worldId: string) =>
@@ -42,13 +43,13 @@ Deno.test("one world's dense matches cannot crowd out another world's FTS candid
     });
 
     const victimHits = await victim.search({ query: "zebra" });
-    assertEquals(victimHits.results?.length, 2);
+    assert.deepStrictEqual(victimHits.results?.length, 2);
     for (const hit of victimHits.results ?? []) {
-      assertEquals(hit.text.includes("longer note"), true);
+      assert.deepStrictEqual(hit.text.includes("longer note"), true);
     }
 
     const noisyHits = await noisy.search({ query: "zebra" });
-    assertEquals(noisyHits.results?.length, CANDIDATES);
+    assert.deepStrictEqual(noisyHits.results?.length, CANDIDATES);
   } finally {
     await substrate.dispose();
   }

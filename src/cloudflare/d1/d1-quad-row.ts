@@ -39,6 +39,11 @@ export async function quadToInsertRow(
   quad: rdfjs.Quad,
 ): Promise<InsertQuadRow> {
   const [id] = await hashQuads([quad]);
+  return buildInsertRow(quad, id);
+}
+
+/** buildInsertRow flattens a quad into a D1 insert row under its already-computed content hash. */
+export function buildInsertRow(quad: rdfjs.Quad, id: string): InsertQuadRow {
   const subject = quad.subject;
   const object = quad.object;
   const graph = quad.graph;
@@ -49,12 +54,14 @@ export async function quadToInsertRow(
     p: quad.predicate.value,
     o: object.value,
     o_type: object.termType,
-    o_datatype: object.termType === "Literal"
-      ? (object as rdfjs.Literal).datatype?.value ?? null
-      : null,
-    o_lang: object.termType === "Literal"
-      ? (object as rdfjs.Literal).language || null
-      : null,
+    o_datatype:
+      object.termType === "Literal"
+        ? ((object as rdfjs.Literal).datatype?.value ?? null)
+        : null,
+    o_lang:
+      object.termType === "Literal"
+        ? (object as rdfjs.Literal).language || null
+        : null,
     g: graph.value,
     g_type: graph.termType,
   };

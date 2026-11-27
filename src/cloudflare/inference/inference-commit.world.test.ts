@@ -1,28 +1,30 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected } from "../../../test/thrown.ts";
 import { createCloudflareWorldsSdk } from "@/cloudflare/create-cloudflare-sdk.ts";
 import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 import type { InferenceOptions } from "@/cloudflare/d1-client-base-options.ts";
 import { D1SchemaBuilder } from "@/cloudflare/schema/d1-schema-builder.ts";
 import { on, PREFIX, withWorld } from "./inference-commit-test-helpers.ts";
 
-Deno.test("size guard fails the commit before any write", async () => {
+test("size guard fails the commit before any write", async () => {
   await withWorld(
     { enabled: true, maxAssertedQuads: 2 },
     async ({ sdk, update, rows }) => {
       await update(`INSERT DATA { ex:a ex:p ex:b . ex:c ex:p ex:d . }`);
-      assertEquals((await rows()).length, 2);
-      await assertRejects(
+      assert.deepStrictEqual((await rows()).length, 2);
+      await rejected(
         () =>
           sdk.sparql({ query: `${PREFIX}INSERT DATA { ex:e ex:p ex:f . }` }),
         Error,
         "inference size guard",
       );
-      assertEquals((await rows()).length, 2);
+      assert.deepStrictEqual((await rows()).length, 2);
     },
   );
 });
 
-Deno.test("worldId-scoped worlds infer independently", async () => {
+test("worldId-scoped worlds infer independently", async () => {
   const substrate = await createTestD1();
   try {
     const make = (worldId: string, inference?: InferenceOptions) =>
@@ -40,33 +42,33 @@ Deno.test("worldId-scoped worlds infer independently", async () => {
       `${PREFIX}INSERT DATA { ex:Dog${name} rdfs:subClassOf ex:Animal${name} . ex:rex${name} a ex:Dog${name} . }`;
     await a.sparql({ query: insert("A") });
     await b.sparql({ query: insert("B") });
-    const counts = await substrate.connection.execute<
-      { world_id: string; derived: number; n: number }
-    >({
-      sql:
-        "SELECT world_id, derived, COUNT(*) AS n FROM quads GROUP BY world_id, derived ORDER BY world_id, derived",
+    const counts = await substrate.connection.execute<{
+      world_id: string;
+      derived: number;
+      n: number;
+    }>({
+      sql: "SELECT world_id, derived, COUNT(*) AS n FROM quads GROUP BY world_id, derived ORDER BY world_id, derived",
     });
     const byKey = Object.fromEntries(
       counts.rows.map((r) => [`${r.world_id}:${r.derived}`, Number(r.n)]),
     );
-    assertEquals(byKey["b:0"], 2);
-    assertEquals(byKey["b:1"], undefined);
-    assertEquals(byKey["a:0"], 2);
-    assertEquals((byKey["a:1"] ?? 0) > 0, true);
+    assert.deepStrictEqual(byKey["b:0"], 2);
+    assert.deepStrictEqual(byKey["b:1"], undefined);
+    assert.deepStrictEqual(byKey["a:0"], 2);
+    assert.deepStrictEqual((byKey["a:1"] ?? 0) > 0, true);
   } finally {
     await substrate.dispose();
   }
 });
 
-Deno.test("enabling inference on a database without quads.derived fails closed", async () => {
+test("enabling inference on a database without quads.derived fails closed", async () => {
   const substrate = await createTestD1();
   try {
-    const legacy = new D1SchemaBuilder(32).buildD1QuadsTable().replace(
-      ", derived INTEGER NOT NULL DEFAULT 0",
-      "",
-    );
+    const legacy = new D1SchemaBuilder(32)
+      .buildD1QuadsTable()
+      .replace(", derived INTEGER NOT NULL DEFAULT 0", "");
     await substrate.connection.execute({ sql: legacy });
-    await assertRejects(
+    await rejected(
       () =>
         createCloudflareWorldsSdk({
           database: substrate.database,
@@ -80,18 +82,18 @@ Deno.test("enabling inference on a database without quads.derived fails closed",
   }
 });
 
-Deno.test("enabled: reindex skips inferred rows", async () => {
+test("enabled: reindex skips inferred rows", async () => {
   await withWorld(on, async ({ sdk, update }) => {
     await update(
       `INSERT DATA { ex:Dog rdfs:subClassOf ex:Animal . ex:rex a ex:Dog ; rdfs:label "Rex the dog" . }`,
     );
     const report = await sdk.reindex();
     // Three asserted quads; the inferred `ex:rex a ex:Animal` is not read.
-    assertEquals(report.processedQuadCount, 3);
+    assert.deepStrictEqual(report.processedQuadCount, 3);
   });
 });
 
-Deno.test("world-scoped statements stay within D1's 100 bound-variable cap", async () => {
+test("world-scoped statements stay within D1's 100 bound-variable cap", async () => {
   const substrate = await createTestD1();
   try {
     let widest = 0;
@@ -133,8 +135,12 @@ Deno.test("world-scoped statements stay within D1's 100 bound-variable cap", asy
     const left = await substrate.connection.execute<{ n: number }>({
       sql: "SELECT COUNT(*) AS n FROM quads WHERE derived = 1",
     });
-    assertEquals(Number(left.rows[0]!.n), 196);
-    assertEquals(widest <= 100, true, `widest statement bound ${widest}`);
+    assert.deepStrictEqual(Number(left.rows[0]!.n), 196);
+    assert.deepStrictEqual(
+      widest <= 100,
+      true,
+      `widest statement bound ${widest}`,
+    );
   } finally {
     await substrate.dispose();
   }

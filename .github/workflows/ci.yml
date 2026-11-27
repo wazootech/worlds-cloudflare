@@ -1,26 +1,30 @@
 name: CI
 
 on:
+  # Any base branch, so each PR of a stacked series runs CI (a branches filter
+  # would skip every PR that is not based on main).
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
 
 jobs:
+  # Format, lint, type check, manifest check and tests all run on Bun
+  # (bun run ci). Bun floats on 1.x on purpose so a Bun regression surfaces
+  # early. The publish dry run goes through the jsr CLI (a devDependency that
+  # bundles its own publisher), so no Deno is installed anywhere in CI.
   ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          cache: true
-          deno-version: v2.9.8
-      - name: Install dependencies
-        run: deno ci
+          bun-version: "1.x"
+      - run: bun install --frozen-lockfile --ignore-scripts
       - name: Run CI checks
-        run: deno task ci
+        run: bun run ci
+      - name: Publish dry run (smoke)
+        run: bun run publish:dry
       - name: Reject legacy platform identity names
         run: |
           if grep -R -n -E '\buid\b|world_uid|worldUid|_uid\b' src/; then

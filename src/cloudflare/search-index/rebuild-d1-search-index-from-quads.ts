@@ -1,23 +1,15 @@
-import type * as rdfjs from "@rdfjs/types";
-import { filterQuads } from "@worlds/sdk/quad-store";
-import type { QuadCriteria } from "@worlds/sdk/quad-store";
-import { quadFromD1Row } from "@/cloudflare/d1/d1-quad-row.ts";
+import { rebuildSqlSearchIndex } from "@worlds/sqlite/sql-core";
+import { effectiveLookupChunkSize } from "@/cloudflare/d1/d1-batch-executor.ts";
+import { createD1CommitDialect } from "@/cloudflare/commit/d1-commit-dialect.ts";
+import { createD1CommitDriver } from "@/cloudflare/commit/d1-commit-driver.ts";
+import { DEFAULT_D1_MATCH_PAGE_SIZE } from "@/cloudflare/quad-store/d1-quad-query-builder.ts";
+import { D1VectorSync } from "./d1-vector-sync.ts";
 import {
-  buildMatchQuadsQuery,
-  buildSelectAssertedQuadsPage,
-  DEFAULT_D1_MATCH_PAGE_SIZE,
-} from "@/cloudflare/quad-store/d1-quad-query-builder.ts";
-import {
+  isFullRebuild,
   type ProjectSearchChunksOptions,
-  refreshSearchChunksForQuads,
-} from "./project-search-chunks.ts";
-import { purgeWorldVectors } from "./project-search-chunks-vectors.ts";
-import {
-  emptyVectorSyncReport,
-  logVectorSyncDrift,
-  mergeVectorSyncReports,
-  type VectorSyncReport,
-} from "./vector-sync-report.ts";
+  toProjectionOptions,
+} from "./project-search-chunks-options.ts";
+import type { VectorSyncReport } from "./vector-sync-report.ts";
 
 /**
  * RebuildD1SearchIndexFromQuadsResult reports how many quads and chunk rows were processed.
@@ -31,112 +23,69 @@ export interface RebuildD1SearchIndexFromQuadsResult {
   vectorSync: VectorSyncReport;
 }
 
-export interface ReadProjectSearchChunksOptions
-  extends ProjectSearchChunksOptions {
+export interface ReadProjectSearchChunksOptions extends ProjectSearchChunksOptions {
   readPageSize?: number;
 }
 
 /**
- * rebuildD1SearchIndexFromQuads rebuilds FTS chunk rows from the `quads` table without re-importing graph data.
+ * rebuildD1SearchIndexFromQuads rebuilds FTS chunk rows from the `quads` table
+ * without re-importing graph data, through the shared `rebuildSqlSearchIndex`.
  *
  * Use after schema upgrades, label predicate changes, or discovery-index tuning so existing corpora pick up refreshed `fts_value`.
+ *
+ * An unscoped rebuild clears the world's chunk rows first, so rows of quads
+ * that no longer exist go too. With an include/exclude filter the rebuild is
+ * scoped: it replaces only the chunk rows of the matching quads and leaves the
+ * rest alone. `processedQuadCount` counts every stored quad scanned.
  *
  * When vector sync is on and no include/exclude filter narrows the rebuild,
  * the world's vectors are purged first (worlds-cloudflare#71 item 3): quads
  * removed since the last projection have no surviving D1 row to derive a
  * vector id from, so a rebuild that only upserts would leave their vectors
  * searchable forever. Deleting first and re-upserting makes reindex a true
- * reconcile; a purge failure is counted as drift, not thrown.
+ * reconcile; a purge failure is counted as drift, not thrown. An embedding
+ * failure throws.
  */
 export async function rebuildD1SearchIndexFromQuads(
   options: ReadProjectSearchChunksOptions,
 ): Promise<RebuildD1SearchIndexFromQuadsResult> {
-  const {
-    connection,
-    include,
-    exclude,
-    readPageSize,
-    searchQueryBuilder,
-  } = options;
-  const pageSize = Math.max(
-    1,
-    Math.floor(readPageSize ?? DEFAULT_D1_MATCH_PAGE_SIZE),
-  );
-  const matcher = filterQuads({ include, exclude });
-  // A filtered rebuild only touches a subset, so a wholesale vector purge
-  // would delete vectors the rebuild never re-upserts.
-  const hasCriteria = (criteria?: QuadCriteria) =>
-    Boolean(
-      criteria?.subjects?.length || criteria?.predicates?.length ||
-        criteria?.graphs?.length,
-    );
-  const fullRebuild = !hasCriteria(include) && !hasCriteria(exclude);
-
-  let processedQuadCount = 0;
-  let chunkRowCount = 0;
-  let vectorSync = emptyVectorSyncReport(
-    Boolean(options.embeddingService && options.vectorSearch),
-  );
-  if (fullRebuild) {
-    vectorSync = mergeVectorSyncReports(
-      vectorSync,
-      await purgeWorldVectors(options),
-    );
-  }
-  let afterQuadId: string | undefined;
-
-  for (;;) {
-    // Inferred rows are not indexed: they are rebuildable from asserted ones,
-    // and indexing them would put entailed copies in search results.
-    const query = options.inference?.enabled
-      ? buildSelectAssertedQuadsPage(
-        { afterQuadId, limit: pageSize },
-        searchQueryBuilder.worldId,
-      )
-      : buildMatchQuadsQuery(
-        { subject: null, predicate: null, object: null, graph: null },
-        { afterQuadId, limit: pageSize },
-        searchQueryBuilder.worldId,
-      );
-    const resultSet = await connection.execute(query);
-
-    if (resultSet.rows.length === 0) {
-      break;
-    }
-
-    const pageQuads: rdfjs.Quad[] = [];
-    for (const row of resultSet.rows) {
-      afterQuadId = String(row.id);
-      try {
-        const reconstructedQuad = quadFromD1Row(row);
-        if (matcher(reconstructedQuad)) {
-          pageQuads.push(reconstructedQuad);
-        }
-        processedQuadCount++;
-      } catch (error) {
-        console.warn(
-          `rebuildD1SearchIndexFromQuads: skipping corrupt row s="${row.s}"`,
-          error,
-        );
-      }
-    }
-
-    if (pageQuads.length > 0) {
-      const refreshed = await refreshSearchChunksForQuads(pageQuads, options);
-      chunkRowCount += refreshed.chunkRowCount;
-      vectorSync = mergeVectorSyncReports(vectorSync, refreshed.vectorSync);
-    }
-
-    if (resultSet.rows.length < pageSize) {
-      break;
-    }
-  }
-
-  logVectorSyncDrift(vectorSync, {
-    worldId: searchQueryBuilder.worldId,
-    operation: "reindex",
+  const { worldId } = options.searchQueryBuilder;
+  const sync = new D1VectorSync(options);
+  if (isFullRebuild(options)) await sync.purgeWorld();
+  const driver = createD1CommitDriver({
+    ...options,
+    worldId,
+    inferenceEnabled: options.inference?.enabled === true,
+    beforePage: sync.beforePage,
   });
-  return { processedQuadCount, chunkRowCount, vectorSync };
+  const dialect = createD1CommitDialect({
+    searchQueryBuilder: options.searchQueryBuilder,
+    worldId,
+    lookupChunkSize: effectiveLookupChunkSize(
+      options.maxLookupChunkSize,
+      Boolean(worldId),
+    ),
+    onChunkRows: sync.collect,
+  });
+  const chunkRowCount = await rebuildSqlSearchIndex(
+    driver,
+    dialect,
+    toProjectionOptions(options),
+    {
+      scope: { include: options.include, exclude: options.exclude },
+      pageSize: Math.max(
+        1,
+        Math.floor(options.readPageSize ?? DEFAULT_D1_MATCH_PAGE_SIZE),
+      ),
+    },
+  );
+  await sync.flush();
+  sync.logDrift("reindex");
+  return {
+    processedQuadCount: driver.processedQuadCount,
+    chunkRowCount,
+    vectorSync: sync.report,
+  };
 }
 
 /**

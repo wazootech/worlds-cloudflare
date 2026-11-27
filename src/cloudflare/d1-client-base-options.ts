@@ -51,14 +51,17 @@ export interface D1ClientBaseOptions extends QuadFilter {
    */
   matchPageSize?: number;
 
-  /** maxWriteBatchSize caps how many statements are sent per D1 batch. Defaults to 100, a chosen chunk size: Cloudflare documents no per-batch statement cap (100 is the bound-parameter limit per statement). */
+  /** maxWriteBatchSize caps how many statements are sent per D1 batch, and so how many a commit may hold and still be atomic. Defaults to 2,000, the largest count measured fine on a real D1 at every vector dimension (Cloudflare documents no per-batch statement cap; the 100 limit is bound parameters per statement, a separate cap). */
   maxWriteBatchSize?: number;
+
+  /** maxBatchWeight caps the estimated serialized bytes per D1 batch (default 16 MiB, 2x under the 32 MiB Worker-to-D1 RPC limit measured on a real D1). A commit is atomic only if it fits this and `maxWriteBatchSize`; heavy rows (1,536-dim vectors) hit this first. */
+  maxBatchWeight?: number;
 
   /**
    * searchIndexOnImport controls when FTS/vector chunk projection runs during import.
    *
-   * - `"incremental"`: chunks each quad on commit.
-   * - `"deferred"` (default for Cloudflare): persists quads on each import, rebuilds FTS/vector chunks in one pass afterward.
+   * - `"incremental"` (default): chunks each quad on commit, so an import embeds only the quads it writes.
+   * - `"deferred"`: persists quads on each import, then rebuilds FTS/vector chunks for the whole world in one pass.
    * - `"disabled"`: skips chunking entirely; caller calls `client.reindex()` before searching.
    */
   searchIndexOnImport?: SearchIndexOnImport;

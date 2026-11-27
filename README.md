@@ -31,13 +31,135 @@ vector query is filtered on it, and vector ids are namespaced per world, so
 identical triple text in two worlds never shares a vector
 ([worlds-cloudflare#41](https://github.com/wazootech/worlds-cloudflare/issues/41)).
 
-**Vector sync is reported, not swallowed.** A failed embedding, vector upsert,
-or stale-vector delete never fails an import (D1 is the source of truth and
-keyword search keeps serving), but it is logged as a structured `[vector-sync]`
-error and counted. `CloudflareSearchIndex.reindex()` returns `vectorSync`
-(`attempted`, `upserted`, `failedUpserts`, `embeddingFailures`,
-`staleDeleteFailures`, `errors`), and rerunning reindex repairs the drift
+**Vector sync is reported, not swallowed.** A failed vector upsert or
+stale-vector delete never fails an import (D1 is the source of truth and keyword
+search keeps serving), but it is logged as a structured `[vector-sync]` error
+and counted. `CloudflareSearchIndex.reindex()` returns `vectorSync`
+(`attempted`, `upserted`, `failedUpserts`, `staleDeleteFailures`, `errors`;
+`embeddingFailures` is always 0, kept so report schemas keep parsing), and
+rerunning reindex repairs the drift
 ([worlds-cloudflare#40](https://github.com/wazootech/worlds-cloudflare/issues/40)).
+
+**An embedding failure throws.** Like every `worlds-*` backend, a commit or
+reindex whose embedding service fails (or returns vectors of the wrong length)
+rejects before anything is written, so the caller can retry. Writes therefore
+fail while the embedding service is down; there is no keyword-only fallback and
+no stale marker.
+
+**Commit path.** Commits run through the shared `commitSqlPatch` and reindex
+through `rebuildSqlSearchIndex` from `@worlds/sqlite/sql-core`; this package
+only supplies a D1 driver and dialect (`src/cloudflare/commit/`). Differences
+from the shared behavior, each forced by the platform or kept for hosted
+consumers:
+
+- **Atomicity is bounded by one `batch()` call.** D1's atomic unit is a single
+  `batch()`. A commit that fits in one batch under both limits, at most
+  `maxWriteBatchSize` statements (default 2,000) and at most `maxBatchWeight`
+  estimated serialized bytes (default 16 MiB, `DEFAULT_D1_MAX_BATCH_WEIGHT`), is
+  one atomic batch, including its chunk rows, and a failed replace import keeps
+  the old graph. A larger commit takes the core's chunked fallback, which fills
+  each batch up to both limits: not atomic, a failure removes the quads written
+  so far, and a replace import that fails after its wipe leaves an empty graph.
+  Each quad costs about two statements (a quad row and a chunk row). By the
+  estimate below, an import stays atomic up to about 1,000 quads with 384-dim
+  vectors (the count limit binds) and about 640 quads with 1,536-dim vectors
+  (the byte budget binds); beyond that it takes the chunked fallback. Raise or
+  lower either limit through the `maxWriteBatchSize` and `maxBatchWeight`
+  options, mindful of the payload limit below. The default was 100 before the
+  first real-D1 measurement (imports of 50 or more quads took the non-atomic
+  fallback) and 750 in an unreleased build; this release replaces it with the
+  2,000 count plus the byte guard. Cloudflare documents no per-batch statement
+  cap (read 2026-11-22,
+  <https://developers.cloudflare.com/d1/platform/limits/>): a `db.batch()`
+  "counts as a single query" against the 1000 (paid) / 50 (free) queries per
+  invocation, the 30 second query duration "also applies to the entire batch
+  call", and the 100 bound parameters and 100,000 byte statement length are
+  per-statement limits that still apply inside a batch (the lookup chunk size
+  stays 100). The binding has one more limit, found by measurement: **the
+  Worker-to-D1 RPC rejects a `batch()` whose serialized arguments exceed 32
+  MiB**
+  (`D1_ERROR: Serialized RPC arguments or return values are limited to
+32MiB`).
+  It is a byte limit, so the safe statement count depends on row size.
+  - **Measured on a real D1 throwaway database, 2026-11-22** (Worker binding,
+    `wrangler dev --remote`, the repo's `quads`/`chunks` schema with the 7 quad
+    indexes, the chunk index, the FTS5 table and its triggers; one run each, so
+    timings are indicative, not statistical). "Mixed" alternates a quad row and
+    a chunk row, as an import does; "chunks" is chunk rows only (a reindex).
+    Chunk rows carry a float32 BLOB vector and about 200 characters of text.
+
+    | statements | row kind                  | payload (raw) | wall ms (Worker) | result                                |
+    | ---------- | ------------------------- | ------------- | ---------------- | ------------------------------------- |
+    | 100        | mixed, 384-dim            | 0.11 MB       | 99 (87 on rerun) | ok                                    |
+    | 500        | mixed, 384-dim            | 0.57 MB       | 268              | ok                                    |
+    | 1,000      | mixed, 384-dim            | 1.1 MB        | 387              | ok                                    |
+    | 2,000      | mixed, 384-dim            | 2.3 MB        | 710              | ok                                    |
+    | 4,000      | mixed, 384-dim            | 4.6 MB        | 1,411            | ok                                    |
+    | 2,000      | chunks, 384-dim           | 4.0 MB        | 1,034            | ok                                    |
+    | 3,000      | chunks, 384-dim           | 6.0 MB        | 2,044            | ok                                    |
+    | 4,000      | chunks, 384-dim           | 8.0 MB        | 3,243            | ok                                    |
+    | 100        | mixed, 1,536-dim          | 0.34 MB       | 121              | ok                                    |
+    | 500        | mixed, 1,536-dim          | 1.7 MB        | 391              | ok                                    |
+    | 1,000      | mixed, 1,536-dim          | 3.4 MB        | 870              | ok                                    |
+    | 2,000      | mixed, 1,536-dim          | 6.9 MB        | 1,425            | ok (about 22.7 MB serialized)         |
+    | 4,000      | mixed, 1,536-dim          | 13.8 MB       | n/a              | rejected, 45.3 MB serialized > 32 MiB |
+    | 1,000      | chunks, 1,536-dim         | 6.6 MB        | 1,511            | ok                                    |
+    | 1,400      | chunks, 1,536-dim         | 9.2 MB        | 1,707            | ok                                    |
+    | 1,500      | chunks, 1,536-dim         | 9.9 MB        | 2,584            | ok                                    |
+    | 1,510      | chunks, 1,536-dim         | 10.0 MB       | n/a              | rejected, 33.6 MB serialized > 32 MiB |
+    | 2,000      | chunks, 1,536-dim (heavy) | 13.2 MB       | n/a              | rejected, 44.5 MB serialized > 32 MiB |
+
+    A 1,536-dim chunk row serializes to about 22 KB (3.6x its raw BLOB bytes),
+    so pure heavy-chunk batches top out near 1,500 statements, while 2,000
+    statements were accepted at every other measured shape. Time was never the
+    constraint: every accepted batch finished in under 3 s against the
+    documented 30 s, and D1 reported under 0.6 s of summed SQL time for every
+    batch up to 2,000 statements (1.7 s at 4,000 chunk rows). **Atomic
+    rollback** was verified on real D1: a batch whose last statement duplicated
+    an earlier primary key (after 500, then 2,000 statements, 384-dim and
+    1,536-dim) failed with `UNIQUE constraint failed` and left zero rows in
+    `quads` and `chunks`; a last statement against a missing table did the same
+    (rejected before any row was written).
+
+  - **The byte estimate is an ESTIMATE, calibrated from those points.** The
+    commit driver weighs each statement as its SQL text length, 64 bytes of
+    overhead, and its bound parameters: strings by UTF-16 code units, BLOBs (the
+    float32 vector) at 4 bytes per raw byte (measured about 3.6, rounded up to
+    err high), numbers, booleans and null at 8 bytes. It puts a 1,536-dim chunk
+    row near 25 KB, a 768-dim one near 13 KB and a 384-dim one near 7 KB, so
+    2,000 heavy chunk rows estimate well over 16 MiB and 2,000 mixed 384-dim
+    rows do not. The unit tests check that the estimate is not below the
+    serialized sizes measured above, using the repo's own statement builders; no
+    real D1 call checked the estimator itself. The 16 MiB budget leaves 2x
+    headroom under 32 MiB for its error. Both are exported and overridable
+    (`d1StatementWeight`, `DEFAULT_D1_MAX_BATCH_WEIGHT`, the `maxBatchWeight`
+    option).
+  - **This change was not re-verified on a real D1.** The measurements above
+    predate the byte budget; the budget, the 2,000 default and the estimator are
+    tested on miniflare and with fakes only, and miniflare enforces no 32 MiB
+    limit.
+  - **Not measured:** the estimator and the 16 MiB budget on a real D1 after
+    this change, concurrent writers or load, production latency under realistic
+    contention (this was an idle new database from one location, WNAM), batches
+    above 4,000 statements of 384-dim rows (the 32 MiB bound suggests about
+    6,000 chunk rows of 384 dimensions), chunk text far longer than 200
+    characters (a larger `value`/`fts_value` shrinks the safe count), and
+    databases with large existing tables. Production batch timing and the
+    `Too many API requests by single Worker invocation` limit were not
+    exercised.
+- **Vectorize is outside D1.** Vectors sync after the D1 write lands, so a
+  Vectorize failure is logged drift (above), never a rollback.
+- **Deleting a quad leaves its chunk rows** until a reindex or the hosted API's
+  orphan cleanup, because those rows are the only record of the Vectorize ids to
+  remove.
+- **`searchIndexOnImport` defaults to `"incremental"`**, the shared default: an
+  import projects chunks and embeds only the quads it writes, so a failed
+  embedding throws before anything is written. `"deferred"` (persist quads, then
+  rebuild the whole world's index) is an option, not the default. Measured on
+  miniflare (worlds-cloudflare#92), `incremental` issues the same number of
+  statements and about the same number of `batch()` calls as `deferred`, embeds
+  fewer texts when merging into a populated world, and leaves nothing behind
+  when embedding fails; `deferred` leaves quads without chunk rows.
 
 This package consumes the shared, driver-free SQL plan layer from
 [`@worlds/sqlite/sql-core`](https://jsr.io/@worlds/sqlite) — the FTS5
@@ -101,9 +223,10 @@ const sdk = await createCloudflareWorldsSdk({
   closure, and reports counts and inconsistencies. It is idempotent, honors
   `maxAssertedQuads` before any write, and never touches asserted rows. The
   clear and the writes are separate batches, so after a failure run it again.
-- **Inconsistencies.** `commitPatchToD1` returns the reasoner's
-  `inconsistencies`; they do not block the write. SHACL validation does not
-  exist in this package; if added, it must run after inference.
+- **Inconsistencies.** `backfillInference` returns the reasoner's
+  `inconsistencies`; a commit does not report them and they do not block the
+  write. SHACL validation does not exist in this package; if added, it must run
+  after inference.
 
 ## Install
 
@@ -130,14 +253,14 @@ With an import map:
 
 ```html
 <script type="importmap">
-{
-  "imports": {
-    "@worlds/cloudflare": "https://esm.sh/jsr/@worlds/cloudflare@0.8.0"
+  {
+    "imports": {
+      "@worlds/cloudflare": "https://esm.sh/jsr/@worlds/cloudflare@0.8.0"
+    }
   }
-}
 </script>
 <script type="module">
-import { createCloudflareWorldsSdk } from "@worlds/cloudflare";
+  import { createCloudflareWorldsSdk } from "@worlds/cloudflare";
 </script>
 ```
 
@@ -168,18 +291,17 @@ npx jsr add @worlds/cloudflare
 ## Releases
 
 Every push to `main` runs the [Publish workflow](.github/workflows/publish.yml),
-which publishes only when `deno.json`'s `version` is not yet on JSR:
+which publishes only when `jsr.json`'s `version` is not yet on JSR:
 
 - **Release PR** (bumps `version`): merging it publishes the new version of
   `@worlds/cloudflare`.
 - **Routine PR** (no bump): the Publish job skips green with a notice. That is
   expected, not a failure.
 
-To release, bump `version` in `deno.json` (minor for additive public API, patch
-for fixes) in the PR that should ship. If the package ever imports a pinned
-`jsr:@worlds/cloudflare@<version>` of itself, commit that entry to `deno.lock`;
-otherwise a cold CI run rewrites the lockfile and `deno publish` aborts on the
-dirty tree.
+To release, bump `version` in `jsr.json` (minor for additive public API, patch
+for fixes) in the PR that should ship. The workflow publishes with
+`bunx jsr publish` (the `jsr` CLI pinned in `package.json`), so a release needs
+no Deno install.
 
 ## License
 

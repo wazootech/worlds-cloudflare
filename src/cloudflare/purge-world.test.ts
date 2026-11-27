@@ -1,4 +1,6 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected } from "../../test/thrown.ts";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { FakeEmbeddingService } from "@worlds/sdk/search-index/embedding-service";
 import { buildSearchResultId } from "@worlds/sqlite/sql-core";
@@ -93,83 +95,83 @@ async function count(
   const result = await connection.execute(
     worldId
       ? {
-        sql: `SELECT COUNT(*) AS n FROM ${table} WHERE world_id = ?`,
-        args: [worldId],
-      }
+          sql: `SELECT COUNT(*) AS n FROM ${table} WHERE world_id = ?`,
+          args: [worldId],
+        }
       : { sql: `SELECT COUNT(*) AS n FROM ${table}` },
   );
   return result.rows[0] ? Number((result.rows[0] as { n: number }).n) : 0;
 }
 
-Deno.test(
-  "purgeWorld removes quads, chunks and vectors for the world only (#71 item 6)",
-  async () => {
-    const { worldA, worldB, connection, dispose } = await createContext();
-    try {
-      await worldA.quadStore.import({
-        source: {
-          kind: "quads",
-          quads: [quadText("urn:a", "world a content")],
-        },
-      });
-      await worldB.quadStore.import({
-        source: {
-          kind: "quads",
-          quads: [quadText("urn:b", "world b content")],
-        },
-      });
-      const idA = await vectorIdFor("urn:a", "world a content");
-      const idB = await vectorIdFor("urn:b", "world b content");
-      assertEquals(worldA.vectorSearch.has(idA), true);
-      assertEquals(worldB.vectorSearch.has(idB), true);
-      assertEquals(await count(connection, "quads", WORLD_A), 1);
-      assertEquals(await count(connection, "chunks", WORLD_A), 1);
+test("purgeWorld removes quads, chunks and vectors for the world only (#71 item 6)", async () => {
+  const { worldA, worldB, connection, dispose } = await createContext();
+  try {
+    await worldA.quadStore.import({
+      source: {
+        kind: "quads",
+        quads: [quadText("urn:a", "world a content")],
+      },
+    });
+    await worldB.quadStore.import({
+      source: {
+        kind: "quads",
+        quads: [quadText("urn:b", "world b content")],
+      },
+    });
+    const idA = await vectorIdFor("urn:a", "world a content");
+    const idB = await vectorIdFor("urn:b", "world b content");
+    assert.deepStrictEqual(worldA.vectorSearch.has(idA), true);
+    assert.deepStrictEqual(worldB.vectorSearch.has(idB), true);
+    assert.deepStrictEqual(await count(connection, "quads", WORLD_A), 1);
+    assert.deepStrictEqual(await count(connection, "chunks", WORLD_A), 1);
 
-      const result = await purgeWorld({
-        connection,
-        worldId: WORLD_A,
-        vectorSearch: worldA.vectorSearch,
-      });
+    const result = await purgeWorld({
+      connection,
+      worldId: WORLD_A,
+      vectorSearch: worldA.vectorSearch,
+    });
 
-      assertEquals(result, { vectorsPurged: true, vectorsSkipped: false });
-      assertEquals(await count(connection, "quads", WORLD_A), 0);
-      assertEquals(await count(connection, "chunks", WORLD_A), 0);
-      assertEquals(worldA.vectorSearch.has(idA), false);
-      // The other world is untouched.
-      assertEquals(await count(connection, "quads", WORLD_B), 1);
-      assertEquals(await count(connection, "chunks", WORLD_B), 1);
-      assertEquals(worldB.vectorSearch.has(idB), true);
-    } finally {
-      await dispose();
-    }
-  },
-);
+    assert.deepStrictEqual(result, {
+      vectorsPurged: true,
+      vectorsSkipped: false,
+    });
+    assert.deepStrictEqual(await count(connection, "quads", WORLD_A), 0);
+    assert.deepStrictEqual(await count(connection, "chunks", WORLD_A), 0);
+    assert.deepStrictEqual(worldA.vectorSearch.has(idA), false);
+    // The other world is untouched.
+    assert.deepStrictEqual(await count(connection, "quads", WORLD_B), 1);
+    assert.deepStrictEqual(await count(connection, "chunks", WORLD_B), 1);
+    assert.deepStrictEqual(worldB.vectorSearch.has(idB), true);
+  } finally {
+    await dispose();
+  }
+});
 
-Deno.test(
-  "purgeWorld without a vector index reports the skip and still purges rows (#71 item 6)",
-  async () => {
-    const { worldA, connection, dispose } = await createContext();
-    try {
-      await worldA.quadStore.import({
-        source: {
-          kind: "quads",
-          quads: [quadText("urn:a", "world a content")],
-        },
-      });
-      const result = await purgeWorld({ connection, worldId: WORLD_A });
-      assertEquals(result, { vectorsPurged: false, vectorsSkipped: true });
-      assertEquals(await count(connection, "quads", WORLD_A), 0);
-      assertEquals(await count(connection, "chunks", WORLD_A), 0);
-    } finally {
-      await dispose();
-    }
-  },
-);
+test("purgeWorld without a vector index reports the skip and still purges rows (#71 item 6)", async () => {
+  const { worldA, connection, dispose } = await createContext();
+  try {
+    await worldA.quadStore.import({
+      source: {
+        kind: "quads",
+        quads: [quadText("urn:a", "world a content")],
+      },
+    });
+    const result = await purgeWorld({ connection, worldId: WORLD_A });
+    assert.deepStrictEqual(result, {
+      vectorsPurged: false,
+      vectorsSkipped: true,
+    });
+    assert.deepStrictEqual(await count(connection, "quads", WORLD_A), 0);
+    assert.deepStrictEqual(await count(connection, "chunks", WORLD_A), 0);
+  } finally {
+    await dispose();
+  }
+});
 
-Deno.test("purgeWorld refuses an empty worldId (#71 item 6)", async () => {
+test("purgeWorld refuses an empty worldId (#71 item 6)", async () => {
   const { connection, dispose } = await createContext();
   try {
-    await assertRejects(
+    await rejected(
       () => purgeWorld({ connection, worldId: "" }),
       Error,
       "unscoped purge",

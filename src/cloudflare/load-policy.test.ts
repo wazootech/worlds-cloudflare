@@ -1,4 +1,6 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected } from "../../test/thrown.ts";
 import { createCloudflareWorldsSdk } from "./create-cloudflare-sdk.ts";
 import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 
@@ -11,7 +13,7 @@ const REMOTE_LOADS = [
   "LOAD <https://[::1]/data.ttl> INTO GRAPH <urn:graph:g>",
 ];
 
-Deno.test("hosted SDK denies remote SPARQL LOAD by default and never fetches", async () => {
+test("hosted SDK denies remote SPARQL LOAD by default and never fetches", async () => {
   const substrate = await createTestD1();
   const sdk = await createCloudflareWorldsSdk({ database: substrate.database });
   const realFetch = globalThis.fetch;
@@ -22,13 +24,13 @@ Deno.test("hosted SDK denies remote SPARQL LOAD by default and never fetches", a
   };
   try {
     for (const query of REMOTE_LOADS) {
-      const error = await assertRejects(() => sdk.sparql({ query }));
-      assert(
+      const error = await rejected(() => sdk.sparql({ query }));
+      assert.ok(
         POLICY_ERROR.test((error as Error).message),
         `unexpected error for ${query}: ${(error as Error).message}`,
       );
     }
-    assertEquals(calls, []);
+    assert.deepStrictEqual(calls, []);
   } finally {
     globalThis.fetch = realFetch;
     await substrate.dispose();

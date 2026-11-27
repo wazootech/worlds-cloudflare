@@ -17,7 +17,8 @@
  * Search ordering is compared set-wise (strictSearchOrder: false): FTS5
  * ranking vs scan order is an engine detail, not a parity contract.
  */
-import { assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { createCloudflareWorldsSdk } from "@/cloudflare/mod.ts";
 import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 import { createMemoryWorldsSdk } from "@worlds/sdk/memory";
@@ -33,42 +34,39 @@ async function createCloudflareSdkForParity() {
   return createCloudflareWorldsSdk({ database: substrate.database });
 }
 
-Deno.test(
-  "parity suite - cloudflare agrees with the in-memory reference on the corpus",
-  async () => {
-    const fixtures = parityCorpus.fixtures.filter(
-      (fixture) => fixture.name !== CHUNKER_DIVERGENT_FIXTURE,
-    );
+test("parity suite - cloudflare agrees with the in-memory reference on the corpus", async () => {
+  const fixtures = parityCorpus.fixtures.filter(
+    (fixture) => fixture.name !== CHUNKER_DIVERGENT_FIXTURE,
+  );
 
-    let report;
-    try {
-      report = await runParitySuite({
-        reference: () => createMemoryWorldsSdk(),
-        candidate: () => createCloudflareSdkForParity(),
-        fixtures,
-        strictSearchOrder: false,
-      });
-    } finally {
-      for (const dispose of disposers.splice(0)) {
-        await dispose();
-      }
+  let report;
+  try {
+    report = await runParitySuite({
+      reference: () => createMemoryWorldsSdk(),
+      candidate: () => createCloudflareSdkForParity(),
+      fixtures,
+      strictSearchOrder: false,
+    });
+  } finally {
+    for (const dispose of disposers.splice(0)) {
+      await dispose();
     }
+  }
 
-    assertEquals(
-      report.results.length,
-      fixtures.length + parityCorpus.replaceCases.length,
-      "every non-exempted corpus fixture and replace case runs on both",
-    );
-    assertEquals(
-      report.ok,
-      true,
-      report.results
-        .map(
-          (r) =>
-            `${r.name}: ${r.failures.join("; ")}` +
-            `${r.notes ? ` [notes: ${r.notes.join("; ")}]` : ""}`,
-        )
-        .join("\n"),
-    );
-  },
-);
+  assert.deepStrictEqual(
+    report.results.length,
+    fixtures.length + parityCorpus.replaceCases.length,
+    "every non-exempted corpus fixture and replace case runs on both",
+  );
+  assert.deepStrictEqual(
+    report.ok,
+    true,
+    report.results
+      .map(
+        (r) =>
+          `${r.name}: ${r.failures.join("; ")}` +
+          `${r.notes ? ` [notes: ${r.notes.join("; ")}]` : ""}`,
+      )
+      .join("\n"),
+  );
+});

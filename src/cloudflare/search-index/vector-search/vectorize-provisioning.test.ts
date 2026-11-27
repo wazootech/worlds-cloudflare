@@ -1,4 +1,6 @@
-import { assert, assertEquals, assertThrows } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { thrown } from "../../../../test/thrown.ts";
 import {
   checkVectorizeIndex,
   DEFAULT_VECTORIZE_DIMENSIONS,
@@ -10,27 +12,30 @@ const NAME = "worlds-api-qa-v1-metadata";
 const good = { name: NAME, config: { dimensions: 1536, metric: "cosine" } };
 const worldIdIndex = [{ propertyName: "world_id", indexType: "string" }];
 
-Deno.test("plan creates the index then registers world_id before any write", () => {
-  assertEquals(planVectorizeProvisioning({ name: NAME }), [
+test("plan creates the index then registers world_id before any write", () => {
+  assert.deepStrictEqual(planVectorizeProvisioning({ name: NAME }), [
     `wrangler vectorize create ${NAME} --dimensions ${DEFAULT_VECTORIZE_DIMENSIONS} --metric cosine`,
     `wrangler vectorize create-metadata-index ${NAME} --propertyName world_id --type string`,
   ]);
 });
 
-Deno.test("plan honors explicit dimensions and rejects bad input", () => {
-  assert(
+test("plan honors explicit dimensions and rejects bad input", () => {
+  assert.ok(
     planVectorizeProvisioning({ name: NAME, dimensions: 512 })[0].includes(
       "--dimensions 512",
     ),
   );
-  assertThrows(() => planVectorizeProvisioning({ name: "Bad Name" }));
-  assertThrows(() => planVectorizeProvisioning({ name: NAME, dimensions: 0 }));
+  thrown(() => planVectorizeProvisioning({ name: "Bad Name" }));
+  thrown(() => planVectorizeProvisioning({ name: NAME, dimensions: 0 }));
 });
 
-Deno.test("a conforming index has no problems", () => {
-  assertEquals(checkVectorizeIndex({ name: NAME }, good, worldIdIndex), []);
+test("a conforming index has no problems", () => {
+  assert.deepStrictEqual(
+    checkVectorizeIndex({ name: NAME }, good, worldIdIndex),
+    [],
+  );
   // snake_case rows (REST API shape) are accepted too.
-  assertEquals(
+  assert.deepStrictEqual(
     checkVectorizeIndex({ name: NAME }, good, [
       { property_name: "world_id", index_type: "string" },
     ]),
@@ -38,8 +43,8 @@ Deno.test("a conforming index has no problems", () => {
   );
 });
 
-Deno.test("wrangler's capitalized property type is accepted", () => {
-  assertEquals(
+test("wrangler's capitalized property type is accepted", () => {
+  assert.deepStrictEqual(
     checkVectorizeIndex({ name: NAME }, good, [
       { propertyName: "world_id", indexType: "String" },
     ]),
@@ -47,27 +52,27 @@ Deno.test("wrangler's capitalized property type is accepted", () => {
   );
 });
 
-Deno.test("a missing index fails loudly with the provisioning commands", () => {
+test("a missing index fails loudly with the provisioning commands", () => {
   const [problem, ...rest] = checkVectorizeIndex({ name: NAME }, undefined, []);
-  assertEquals(rest, []);
-  assert(problem.includes("does not exist"));
-  assert(problem.includes(`wrangler vectorize create ${NAME}`));
+  assert.deepStrictEqual(rest, []);
+  assert.ok(problem.includes("does not exist"));
+  assert.ok(problem.includes(`wrangler vectorize create ${NAME}`));
 });
 
-Deno.test("missing world_id metadata index is reported", () => {
+test("missing world_id metadata index is reported", () => {
   const problems = checkVectorizeIndex({ name: NAME }, good, [
     { propertyName: "other", indexType: "string" },
   ]);
-  assertEquals(problems.length, 1);
-  assert(problems[0].includes(VECTORIZE_FILTERABLE_PROPERTY));
-  assert(problems[0].includes("create-metadata-index"));
+  assert.deepStrictEqual(problems.length, 1);
+  assert.ok(problems[0].includes(VECTORIZE_FILTERABLE_PROPERTY));
+  assert.ok(problems[0].includes("create-metadata-index"));
 });
 
-Deno.test("wrong dimensions, metric and property type are each reported", () => {
+test("wrong dimensions, metric and property type are each reported", () => {
   const problems = checkVectorizeIndex(
     { name: NAME },
     { name: NAME, config: { dimensions: 512, metric: "euclidean" } },
     [{ propertyName: "world_id", indexType: "number" }],
   );
-  assertEquals(problems.length, 3);
+  assert.deepStrictEqual(problems.length, 3);
 });

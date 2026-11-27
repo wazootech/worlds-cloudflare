@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import { DERIVED_GRAPH } from "@wazoo/reasoner";
 import { planInference, quadKey } from "./inference-planner.ts";
@@ -16,27 +17,33 @@ const rexAnimal = quad(ex("rex"), RDF_TYPE, ex("Animal"), defaultGraph());
 const keys = (quads: Iterable<ReturnType<typeof quad>>) =>
   [...quads].map(quadKey);
 
-Deno.test("insertion: extend yields the new entailment", () => {
+test("insertion: extend yields the new entailment", () => {
   const plan = planInference({
     assertedBefore: [dog],
     deletions: [],
     insertions: [rex],
   });
-  assertEquals(keys(plan.derivedToAdd).includes(quadKey(rexAnimal)), true);
-  assertEquals(plan.derivedToRemove, []);
+  assert.deepStrictEqual(
+    keys(plan.derivedToAdd).includes(quadKey(rexAnimal)),
+    true,
+  );
+  assert.deepStrictEqual(plan.derivedToRemove, []);
 });
 
-Deno.test("deletion: retract yields what is no longer entailed", () => {
+test("deletion: retract yields what is no longer entailed", () => {
   const plan = planInference({
     assertedBefore: [dog, rex],
     deletions: [rex],
     insertions: [],
   });
-  assertEquals(keys(plan.derivedToRemove).includes(quadKey(rexAnimal)), true);
-  assertEquals(plan.entailedDeletions, []);
+  assert.deepStrictEqual(
+    keys(plan.derivedToRemove).includes(quadKey(rexAnimal)),
+    true,
+  );
+  assert.deepStrictEqual(plan.entailedDeletions, []);
 });
 
-Deno.test("retracting an asserted quad that is still derivable keeps it as derived", () => {
+test("retracting an asserted quad that is still derivable keeps it as derived", () => {
   const sub = [
     dog,
     quad(ex("Puppy"), SUBCLASS, ex("Dog"), defaultGraph()),
@@ -49,30 +56,33 @@ Deno.test("retracting an asserted quad that is still derivable keeps it as deriv
     deletions: [redundant],
     insertions: [],
   });
-  assertEquals(keys(plan.entailedDeletions), [quadKey(redundant)]);
-  assertEquals(keys(plan.derivedToRemove).includes(quadKey(redundant)), false);
+  assert.deepStrictEqual(keys(plan.entailedDeletions), [quadKey(redundant)]);
+  assert.deepStrictEqual(
+    keys(plan.derivedToRemove).includes(quadKey(redundant)),
+    false,
+  );
 });
 
-Deno.test("deleting a quad that is only derived is ignored by the reasoner but reported as still entailed", () => {
+test("deleting a quad that is only derived is ignored by the reasoner but reported as still entailed", () => {
   const plan = planInference({
     assertedBefore: [dog, rex],
     deletions: [rexAnimal],
     insertions: [],
   });
-  assertEquals(plan.derivedToRemove, []);
-  assertEquals(keys(plan.entailedDeletions), [quadKey(rexAnimal)]);
+  assert.deepStrictEqual(plan.derivedToRemove, []);
+  assert.deepStrictEqual(keys(plan.entailedDeletions), [quadKey(rexAnimal)]);
 });
 
-Deno.test("inserting a quad that is already asserted changes nothing", () => {
+test("inserting a quad that is already asserted changes nothing", () => {
   const plan = planInference({
     assertedBefore: [dog, rex],
     deletions: [],
     insertions: [rex],
   });
-  assertEquals(plan.derivedToAdd, []);
+  assert.deepStrictEqual(plan.derivedToAdd, []);
 });
 
-Deno.test("per-graph mode: a cross-graph entailment lands in the derived graph", () => {
+test("per-graph mode: a cross-graph entailment lands in the derived graph", () => {
   const schema = quad(ex("Dog"), SUBCLASS, ex("Animal"), ex("schema"));
   const data = quad(ex("rex"), RDF_TYPE, ex("Dog"), ex("data"));
   const plan = planInference({
@@ -80,16 +90,14 @@ Deno.test("per-graph mode: a cross-graph entailment lands in the derived graph",
     deletions: [],
     insertions: [data],
   });
-  const crossGraph = quad(
-    ex("rex"),
-    RDF_TYPE,
-    ex("Animal"),
-    DERIVED_GRAPH,
+  const crossGraph = quad(ex("rex"), RDF_TYPE, ex("Animal"), DERIVED_GRAPH);
+  assert.deepStrictEqual(
+    keys(plan.derivedToAdd).includes(quadKey(crossGraph)),
+    true,
   );
-  assertEquals(keys(plan.derivedToAdd).includes(quadKey(crossGraph)), true);
 });
 
-Deno.test("union mode lists the entailment in the default graph", () => {
+test("union mode lists the entailment in the default graph", () => {
   const schema = quad(ex("Dog"), SUBCLASS, ex("Animal"), ex("schema"));
   const data = quad(ex("rex"), RDF_TYPE, ex("Dog"), ex("data"));
   const plan = planInference({
@@ -98,18 +106,18 @@ Deno.test("union mode lists the entailment in the default graph", () => {
     insertions: [data],
     graphs: "union",
   });
-  assertEquals(keys(plan.derivedToAdd).includes(quadKey(rexAnimal)), true);
+  assert.deepStrictEqual(
+    keys(plan.derivedToAdd).includes(quadKey(rexAnimal)),
+    true,
+  );
 });
 
-Deno.test("an inconsistency in the new closure is reported", () => {
+test("an inconsistency in the new closure is reported", () => {
   const DISJOINT = namedNode("http://www.w3.org/2002/07/owl#disjointWith");
   const plan = planInference({
-    assertedBefore: [
-      quad(ex("Cat"), DISJOINT, ex("Dog"), defaultGraph()),
-      rex,
-    ],
+    assertedBefore: [quad(ex("Cat"), DISJOINT, ex("Dog"), defaultGraph()), rex],
     deletions: [],
     insertions: [quad(ex("rex"), RDF_TYPE, ex("Cat"), defaultGraph())],
   });
-  assertEquals(plan.inconsistencies.length > 0, true);
+  assert.deepStrictEqual(plan.inconsistencies.length > 0, true);
 });

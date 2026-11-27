@@ -1,0 +1,27 @@
+{
+  "name": "@worlds/cloudflare",
+  "version": "0.15.2",
+  "description": "Cloudflare D1 durable backend for the Worlds client — RDF/JS quad primitive packaged with the worlds impl.",
+  "license": "WTFPL",
+  "exports": {
+    ".": "./src/mod.ts",
+    "./quad-store": "./src/cloudflare/quad-store/mod.ts",
+    "./search-index": "./src/cloudflare/search-index/mod.ts",
+    "./rdfjs-store": "./src/cloudflare/rdfjs-store/mod.ts",
+    "./schema": "./src/cloudflare/schema/d1-schema-builder.ts"
+  },
+  "imports": {
+    "@/": "./src/",
+    "@langchain/textsplitters": "npm:@langchain/textsplitters@^1.0.1",
+    "@rdfjs/types": "npm:@rdfjs/types@^2.0.1",
+    "@wazoo/reasoner": "jsr:@wazoo/reasoner@^0.4.1",
+    "@wazoo/sparql-engine": "jsr:@wazoo/sparql-engine@^0.5.0",
+    "@worlds/sqlite": "jsr:@worlds/sqlite@^0.8.2",
+    "@worlds/sdk": "jsr:@worlds/sdk@^0.11.0",
+    "miniflare": "npm:miniflare@^4.20260730.0"
+  },
+  "publish": {
+    "include": ["src/", "README.md", "LICENSE"],
+    "exclude": ["src/**/*.test.ts", "test/"]
+  }
+}

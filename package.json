@@ -1,0 +1,39 @@
+{
+  "name": "@worlds/cloudflare",
+  "private": true,
+  "type": "module",
+  "description": "Bun toolchain manifest for @worlds/cloudflare. The published package is described by jsr.json; scripts/check-manifests.ts keeps the two in sync.",
+  "packageManager": "bun@1.4.5",
+  "exports": {
+    ".": "./src/mod.ts",
+    "./quad-store": "./src/cloudflare/quad-store/mod.ts",
+    "./search-index": "./src/cloudflare/search-index/mod.ts",
+    "./rdfjs-store": "./src/cloudflare/rdfjs-store/mod.ts",
+    "./schema": "./src/cloudflare/schema/d1-schema-builder.ts"
+  },
+  "scripts": {
+    "check": "bun check --no-script",
+    "check:manifests": "bun scripts/check-manifests.ts",
+    "ci": "bun run fmt:check && bun run lint && bun run check && bun run check:manifests && bun run test",
+    "fmt": "bun fmt --no-script",
+    "fmt:check": "bun fmt --no-script --check",
+    "lint": "oxlint --deny-warnings",
+    "publish:dry": "jsr publish --dry-run --allow-dirty",
+    "test": "bun test --timeout 120000",
+    "vectorize:verify": "bun scripts/verify-vectorize.ts"
+  },
+  "dependencies": {
+    "@langchain/textsplitters": "^1.0.1",
+    "@rdfjs/types": "^2.0.1",
+    "@wazoo/reasoner": "npm:@jsr/wazoo__reasoner@^0.4.1",
+    "@wazoo/sparql-engine": "npm:@jsr/wazoo__sparql-engine@^0.5.0",
+    "@worlds/sdk": "npm:@jsr/worlds__sdk@^0.11.0",
+    "@worlds/sqlite": "npm:@jsr/worlds__sqlite@^0.8.2",
+    "miniflare": "^4.20260730.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "jsr": "0.14.3",
+    "oxlint": "1.94.0"
+  }
+}
