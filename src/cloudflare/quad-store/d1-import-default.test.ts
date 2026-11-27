@@ -1,4 +1,6 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected } from "../../../test/thrown.ts";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import type { EmbeddingService } from "@worlds/sdk/search-index/embedding-service";
@@ -70,27 +72,27 @@ const merge = (
     importMode: "merge",
   });
 
-Deno.test("a merge import embeds only the quads it writes by default", async () => {
+test("a merge import embeds only the quads it writes by default", async () => {
   const t = await setup();
   try {
     await merge(t, facts("old", 3));
     t.embedder.texts.length = 0;
     await merge(t, [...facts("old", 3), ...facts("new", 2)]);
-    assertEquals(t.embedder.texts.length, 2);
-    assertEquals(await t.count("chunks"), 5);
+    assert.deepStrictEqual(t.embedder.texts.length, 2);
+    assert.deepStrictEqual(await t.count("chunks"), 5);
   } finally {
     await t.substrate.dispose();
   }
 });
 
-Deno.test("an embedding failure on a default import leaves nothing written", async () => {
+test("an embedding failure on a default import leaves nothing written", async () => {
   const t = await setup();
   try {
     await merge(t, facts("old", 3));
     t.embedder.failing = true;
-    await assertRejects(() => merge(t, facts("new", 4)));
-    assertEquals((await t.store.getQuads()).length, 3);
-    assertEquals(await t.count("chunks"), 3);
+    await rejected(() => merge(t, facts("new", 4)));
+    assert.deepStrictEqual((await t.store.getQuads()).length, 3);
+    assert.deepStrictEqual(await t.count("chunks"), 3);
   } finally {
     await t.substrate.dispose();
   }

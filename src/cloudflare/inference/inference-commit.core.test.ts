@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import {
   DERIVED_GRAPH,
   on,
@@ -7,24 +8,24 @@ import {
   withWorld,
 } from "./inference-commit-test-helpers.ts";
 
-Deno.test("inference is off by default: nothing is derived", async () => {
+test("inference is off by default: nothing is derived", async () => {
   await withWorld(undefined, async ({ update, rows }) => {
     await update(
       `INSERT DATA { ex:Dog rdfs:subClassOf ex:Animal . ex:rex a ex:Dog . }`,
     );
     const all = await rows();
-    assertEquals(all.length, 2);
-    assertEquals(all.every((r) => r[4] === 0), true);
+    assert.deepStrictEqual(all.length, 2);
+    assert.deepStrictEqual(all.every((r) => r[4] === 0), true);
   });
 });
 
-Deno.test("enabled: insertions write derived rows that SPARQL can see", async () => {
+test("enabled: insertions write derived rows that SPARQL can see", async () => {
   await withWorld(on, async ({ sdk, update, rows }) => {
     await update(
       `INSERT DATA { ex:Dog rdfs:subClassOf ex:Animal . ex:rex a ex:Dog . }`,
     );
     const derived = (await rows()).filter((r) => r[4] === 1);
-    assertEquals(
+    assert.deepStrictEqual(
       derived.some((r) =>
         r[0] === "ex:rex" && r[1] === TYPE && r[2] === "ex:Animal"
       ),
@@ -33,35 +34,35 @@ Deno.test("enabled: insertions write derived rows that SPARQL can see", async ()
     const ask = await sdk.sparql({
       query: `${PREFIX}ASK { ex:rex a ex:Animal }`,
     });
-    assertEquals(ask.kind, "ask");
-    if (ask.kind === "ask") assertEquals(ask.data.boolean, true);
+    assert.deepStrictEqual(ask.kind, "ask");
+    if (ask.kind === "ask") assert.deepStrictEqual(ask.data.boolean, true);
   });
 });
 
-Deno.test("enabled: deleting the premise removes the derived rows, never asserted ones", async () => {
+test("enabled: deleting the premise removes the derived rows, never asserted ones", async () => {
   await withWorld(on, async ({ update, rows }) => {
     await update(
       `INSERT DATA { ex:Dog rdfs:subClassOf ex:Animal . ex:rex a ex:Dog . ex:fido a ex:Dog . }`,
     );
     await update(`DELETE DATA { ex:rex a ex:Dog . }`);
     const all = await rows();
-    assertEquals(
+    assert.deepStrictEqual(
       all.some((r) => r[0] === "ex:rex"),
       false,
       "rex and its inferences are gone",
     );
-    assertEquals(
+    assert.deepStrictEqual(
       all.some((r) => r[0] === "ex:fido" && r[2] === "ex:Animal" && r[4] === 1),
       true,
     );
-    assertEquals(
+    assert.deepStrictEqual(
       all.filter((r) => r[4] === 0).map((r) => r[0]).sort(),
       ["ex:Dog", "ex:fido"],
     );
   });
 });
 
-Deno.test("enabled: a quad that is asserted and derived stays asserted", async () => {
+test("enabled: a quad that is asserted and derived stays asserted", async () => {
   await withWorld(on, async ({ update, rows }) => {
     await update(
       `INSERT DATA { ex:Dog rdfs:subClassOf ex:Animal . ex:rex a ex:Dog . }`,
@@ -70,15 +71,15 @@ Deno.test("enabled: a quad that is asserted and derived stays asserted", async (
     await update(`INSERT DATA { ex:rex a ex:Animal . }`);
     const find = async () =>
       (await rows()).filter((r) => r[0] === "ex:rex" && r[2] === "ex:Animal");
-    assertEquals((await find()).map((r) => r[4]), [0]);
+    assert.deepStrictEqual((await find()).map((r) => r[4]), [0]);
 
     // Removing the premise must not remove the asserted quad.
     await update(`DELETE DATA { ex:rex a ex:Dog . }`);
-    assertEquals((await find()).map((r) => r[4]), [0]);
+    assert.deepStrictEqual((await find()).map((r) => r[4]), [0]);
   });
 });
 
-Deno.test("enabled: retracting an asserted quad that is still derivable keeps it as derived", async () => {
+test("enabled: retracting an asserted quad that is still derivable keeps it as derived", async () => {
   await withWorld(on, async ({ update, rows }) => {
     await update(
       `INSERT DATA {
@@ -91,11 +92,11 @@ Deno.test("enabled: retracting an asserted quad that is still derivable keeps it
     const kept = (await rows()).filter((r) =>
       r[0] === "ex:rex" && r[2] === "ex:Animal"
     );
-    assertEquals(kept.map((r) => r[4]), [1]);
+    assert.deepStrictEqual(kept.map((r) => r[4]), [1]);
   });
 });
 
-Deno.test("enabled: deleting a derived-only quad leaves it in place", async () => {
+test("enabled: deleting a derived-only quad leaves it in place", async () => {
   await withWorld(on, async ({ update, rows }) => {
     await update(
       `INSERT DATA { ex:Dog rdfs:subClassOf ex:Animal . ex:rex a ex:Dog . }`,
@@ -104,11 +105,11 @@ Deno.test("enabled: deleting a derived-only quad leaves it in place", async () =
     const kept = (await rows()).filter((r) =>
       r[0] === "ex:rex" && r[2] === "ex:Animal"
     );
-    assertEquals(kept.map((r) => r[4]), [1]);
+    assert.deepStrictEqual(kept.map((r) => r[4]), [1]);
   });
 });
 
-Deno.test("enabled, per-graph: a cross-graph entailment is listed in the derived graph", async () => {
+test("enabled, per-graph: a cross-graph entailment is listed in the derived graph", async () => {
   await withWorld(on, async ({ update, rows }) => {
     await update(
       `INSERT DATA {
@@ -117,7 +118,7 @@ Deno.test("enabled, per-graph: a cross-graph entailment is listed in the derived
       }`,
     );
     const derived = (await rows()).filter((r) => r[4] === 1);
-    assertEquals(
+    assert.deepStrictEqual(
       derived.some((r) =>
         r[0] === "ex:rex" && r[2] === "ex:Animal" && r[3] === DERIVED_GRAPH
       ),
@@ -126,7 +127,7 @@ Deno.test("enabled, per-graph: a cross-graph entailment is listed in the derived
   });
 });
 
-Deno.test("enabled, union: the entailment is listed in the default graph", async () => {
+test("enabled, union: the entailment is listed in the default graph", async () => {
   await withWorld(
     { enabled: true, graphs: "union" },
     async ({ update, rows }) => {
@@ -137,7 +138,7 @@ Deno.test("enabled, union: the entailment is listed in the default graph", async
       }`,
       );
       const derived = (await rows()).filter((r) => r[4] === 1);
-      assertEquals(
+      assert.deepStrictEqual(
         derived.some((r) =>
           r[0] === "ex:rex" && r[2] === "ex:Animal" && r[3] === ""
         ),

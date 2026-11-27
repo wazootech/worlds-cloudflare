@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { D1BatchExecutor } from "./d1-batch-executor.ts";
 import { D1ConnectionDriver } from "./d1-connection-driver.ts";
 import type {
@@ -48,7 +49,7 @@ function createStatement(
   return { sql, args };
 }
 
-Deno.test("D1BatchExecutor - flush chunks staged statements at the configured writeBatchSize", async () => {
+test("D1BatchExecutor - flush chunks staged statements at the configured writeBatchSize", async () => {
   const database = new RecordingDatabase();
   const connection = new D1ConnectionDriver(database);
   const executor = new D1BatchExecutor({ connection, writeBatchSize: 100 });
@@ -60,10 +61,10 @@ Deno.test("D1BatchExecutor - flush chunks staged statements at the configured wr
   await executor.stage(statements);
   await executor.flush();
 
-  assertEquals(database.batchCalls, [100, 100, 50]);
+  assert.deepStrictEqual(database.batchCalls, [100, 100, 50]);
 });
 
-Deno.test("D1BatchExecutor - flush sends one batch when staged statements fit writeBatchSize", async () => {
+test("D1BatchExecutor - flush sends one batch when staged statements fit writeBatchSize", async () => {
   const database = new RecordingDatabase();
   const connection = new D1ConnectionDriver(database);
   const executor = new D1BatchExecutor({ connection, writeBatchSize: 100 });
@@ -74,20 +75,20 @@ Deno.test("D1BatchExecutor - flush sends one batch when staged statements fit wr
   ]);
   await executor.flush();
 
-  assertEquals(database.batchCalls, [2]);
+  assert.deepStrictEqual(database.batchCalls, [2]);
 });
 
-Deno.test("D1BatchExecutor - flush with no staged statements makes no batch calls", async () => {
+test("D1BatchExecutor - flush with no staged statements makes no batch calls", async () => {
   const database = new RecordingDatabase();
   const connection = new D1ConnectionDriver(database);
   const executor = new D1BatchExecutor({ connection, writeBatchSize: 100 });
 
   await executor.flush();
 
-  assertEquals(database.batchCalls, []);
+  assert.deepStrictEqual(database.batchCalls, []);
 });
 
-Deno.test("D1BatchExecutor - repeated stage and flush accumulates batches independently", async () => {
+test("D1BatchExecutor - repeated stage and flush accumulates batches independently", async () => {
   const database = new RecordingDatabase();
   const connection = new D1ConnectionDriver(database);
   const executor = new D1BatchExecutor({ connection, writeBatchSize: 100 });
@@ -104,10 +105,10 @@ Deno.test("D1BatchExecutor - repeated stage and flush accumulates batches indepe
   ]);
   await executor.flush();
 
-  assertEquals(database.batchCalls, [100, 50, 1]);
+  assert.deepStrictEqual(database.batchCalls, [100, 50, 1]);
 });
 
-Deno.test("D1BatchExecutor - mid-stream batch failure reports progress and fails closed", async () => {
+test("D1BatchExecutor - mid-stream batch failure reports progress and fails closed", async () => {
   const calls: number[] = [];
   const failingDatabase: D1DatabaseLike = {
     prepare: () => new RecordingStatement(),
@@ -136,12 +137,15 @@ Deno.test("D1BatchExecutor - mid-stream batch failure reports progress and fails
     flushError = error as Error;
   }
 
-  assertEquals(calls, [100, 100]);
-  assertEquals(
+  assert.deepStrictEqual(calls, [100, 100]);
+  assert.deepStrictEqual(
     flushError?.message.includes("after 100 of 250 staged statements"),
     true,
   );
-  assertEquals(flushError?.message.includes("150 not executed"), true);
+  assert.deepStrictEqual(
+    flushError?.message.includes("150 not executed"),
+    true,
+  );
 
   // Fail-closed: further use is refused instead of silently skipping the tail.
   let refusedError: Error | undefined;
@@ -150,8 +154,8 @@ Deno.test("D1BatchExecutor - mid-stream batch failure reports progress and fails
   } catch (error) {
     refusedError = error as Error;
   }
-  assertEquals(refusedError?.message.includes("fail-closed"), true);
-  assertEquals(calls.length, 2, "no batches after failure");
+  assert.deepStrictEqual(refusedError?.message.includes("fail-closed"), true);
+  assert.deepStrictEqual(calls.length, 2, "no batches after failure");
 
   const stageResult = await (async () => {
     try {
@@ -165,5 +169,5 @@ Deno.test("D1BatchExecutor - mid-stream batch failure reports progress and fails
         : "other";
     }
   })();
-  assertEquals(stageResult, "refused");
+  assert.deepStrictEqual(stageResult, "refused");
 });

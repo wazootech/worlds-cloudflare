@@ -1,4 +1,6 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected } from "../../../test/thrown.ts";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import type { EmbeddingService } from "@worlds/sdk/search-index/embedding-service";
@@ -59,7 +61,7 @@ async function setup(options: {
   return { substrate, store, quadStore, vectorSearch, chunkCount };
 }
 
-Deno.test("chunking fails before any write: a splitter error stores nothing", async () => {
+test("chunking fails before any write: a splitter error stores nothing", async () => {
   const t = await setup({
     embeddingService: embedder(32, []),
     textSplitter: {
@@ -67,7 +69,7 @@ Deno.test("chunking fails before any write: a splitter error stores nothing", as
     },
   });
   try {
-    await assertRejects(
+    await rejected(
       () =>
         t.quadStore.createTransaction().addQuads([a]).commit({
           importMode: "merge",
@@ -75,32 +77,36 @@ Deno.test("chunking fails before any write: a splitter error stores nothing", as
       Error,
       "failed to chunk novel textual facts",
     );
-    assertEquals((await t.store.getQuads()).length, 0);
-    assertEquals(await t.chunkCount(), 0);
+    assert.deepStrictEqual((await t.store.getQuads()).length, 0);
+    assert.deepStrictEqual(await t.chunkCount(), 0);
   } finally {
     await t.substrate.dispose();
   }
 });
 
-Deno.test("identical chunk texts are embedded once per commit, and every quad keeps its vector", async () => {
+test("identical chunk texts are embedded once per commit, and every quad keeps its vector", async () => {
   const calls: string[][] = [];
   const t = await setup({ embeddingService: embedder(32, calls) });
   try {
     await t.quadStore.createTransaction().addQuads([a, b]).commit({
       importMode: "merge",
     });
-    assertEquals(calls, [["same text"]]);
-    assertEquals(await t.chunkCount(), 2);
-    assertEquals(t.vectorSearch.size, 2, "each quad keeps its own vector id");
+    assert.deepStrictEqual(calls, [["same text"]]);
+    assert.deepStrictEqual(await t.chunkCount(), 2);
+    assert.deepStrictEqual(
+      t.vectorSearch.size,
+      2,
+      "each quad keeps its own vector id",
+    );
   } finally {
     await t.substrate.dispose();
   }
 });
 
-Deno.test("a vector of the wrong length rejects the commit before any write", async () => {
+test("a vector of the wrong length rejects the commit before any write", async () => {
   const t = await setup({ embeddingService: embedder(8, []) });
   try {
-    await assertRejects(
+    await rejected(
       () =>
         t.quadStore.createTransaction().addQuads([a]).commit({
           importMode: "merge",
@@ -108,9 +114,9 @@ Deno.test("a vector of the wrong length rejects the commit before any write", as
       Error,
       "failed to vectorize literal chunk blocks",
     );
-    assertEquals((await t.store.getQuads()).length, 0);
-    assertEquals(await t.chunkCount(), 0);
-    assertEquals(t.vectorSearch.size, 0, "no vector is synced");
+    assert.deepStrictEqual((await t.store.getQuads()).length, 0);
+    assert.deepStrictEqual(await t.chunkCount(), 0);
+    assert.deepStrictEqual(t.vectorSearch.size, 0, "no vector is synced");
   } finally {
     await t.substrate.dispose();
   }
