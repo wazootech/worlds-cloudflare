@@ -1,4 +1,6 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected } from "../../../test/thrown.ts";
 import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 import { literal, namedNode } from "./d1-rdfjs-store-test-helpers.ts";
 import { D1RdfjsStore } from "./mod.ts";
@@ -9,7 +11,7 @@ import { D1RdfjsStore } from "./mod.ts";
  * every failure since the previous flush, and the queue keeps draining later
  * writes (#71 item 5).
  */
-Deno.test("a failed fire-and-forget write is logged and rejects flush()", async () => {
+test("a failed fire-and-forget write is logged and rejects flush()", async () => {
   const substrate = await createTestD1();
   const errors: unknown[][] = [];
   const original = console.error;
@@ -21,24 +23,24 @@ Deno.test("a failed fire-and-forget write is logged and rejects flush()", async 
     await substrate.connection.execute({ sql: "DROP TABLE quads" });
 
     store.addQuad(namedNode("urn:alice"), namedNode("urn:name"), literal("A"));
-    await assertRejects(() => store.flush());
-    assert(
+    await rejected(() => store.flush());
+    assert.ok(
       errors.length === 1,
       `expected one logged failure, got ${errors.length}`,
     );
     const [message, error] = errors[0]!;
-    assert(
+    assert.ok(
       String(message).includes('addQuad write failed for world "<unscoped>"'),
       `unexpected log message: ${message}`,
     );
-    assert(error instanceof Error);
+    assert.ok(error instanceof Error);
   } finally {
     console.error = original;
     await substrate.dispose();
   }
 });
 
-Deno.test("the write queue keeps draining after a failed write", async () => {
+test("the write queue keeps draining after a failed write", async () => {
   const substrate = await createTestD1();
   const errors: unknown[][] = [];
   const original = console.error;
@@ -66,22 +68,22 @@ Deno.test("the write queue keeps draining after a failed write", async () => {
       },
       (e: unknown) => e,
     );
-    assert(error instanceof AggregateError, `not AggregateError: ${error}`);
-    assertEquals(error.errors.length, 1);
+    assert.ok(error instanceof AggregateError, `not AggregateError: ${error}`);
+    assert.deepStrictEqual(error.errors.length, 1);
     await store.flush();
 
     const rows = await substrate.connection.execute<{ n: number }>({
       sql: "SELECT COUNT(*) AS n FROM quads",
     });
-    assertEquals(Number(rows.rows[0]!.n), 1);
-    assertEquals(errors.length, 1);
+    assert.deepStrictEqual(Number(rows.rows[0]!.n), 1);
+    assert.deepStrictEqual(errors.length, 1);
   } finally {
     console.error = original;
     await substrate.dispose();
   }
 });
 
-Deno.test("flush() aggregates an earlier failure with a later success", async () => {
+test("flush() aggregates an earlier failure with a later success", async () => {
   const substrate = await createTestD1();
   const original = console.error;
   console.error = () => {};
@@ -105,9 +107,9 @@ Deno.test("flush() aggregates an earlier failure with a later success", async ()
       },
       (e: unknown) => e,
     );
-    assert(error instanceof AggregateError, `not AggregateError: ${error}`);
-    assertEquals(error.errors.length, 1);
-    assertEquals(
+    assert.ok(error instanceof AggregateError, `not AggregateError: ${error}`);
+    assert.deepStrictEqual(error.errors.length, 1);
+    assert.deepStrictEqual(
       Number(
         (
           await substrate.connection.execute<{ n: number }>({
@@ -126,7 +128,7 @@ Deno.test("flush() aggregates an earlier failure with a later success", async ()
   }
 });
 
-Deno.test("flush() caps the AggregateError at 10 errors plus a count", async () => {
+test("flush() caps the AggregateError at 10 errors plus a count", async () => {
   const substrate = await createTestD1();
   const original = console.error;
   console.error = () => {};
@@ -147,10 +149,10 @@ Deno.test("flush() caps the AggregateError at 10 errors plus a count", async () 
       },
       (e: unknown) => e,
     );
-    assert(error instanceof AggregateError, `not AggregateError: ${error}`);
-    assertEquals(error.errors.length, 11); // first 10 + one suppression marker
+    assert.ok(error instanceof AggregateError, `not AggregateError: ${error}`);
+    assert.deepStrictEqual(error.errors.length, 11); // first 10 + one suppression marker
     const marker = error.errors[10]! as Error;
-    assert(
+    assert.ok(
       marker.message.includes("2 more write failure(s) suppressed"),
       `unexpected marker: ${marker.message}`,
     );
