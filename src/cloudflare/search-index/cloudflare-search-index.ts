@@ -33,9 +33,7 @@ export type {
  * failure degrades gracefully to keyword-only.
  */
 export class CloudflareSearchIndex implements SearchIndexInterface {
-  public constructor(
-    private readonly options: CloudflareSearchIndexOptions,
-  ) {}
+  public constructor(private readonly options: CloudflareSearchIndexOptions) {}
 
   /**
    * search executes a keyword and/or vector query against the index and fuses
@@ -51,8 +49,8 @@ export class CloudflareSearchIndex implements SearchIndexInterface {
     // Provider-internal candidate pool: the window that gets ranked before
     // normalization and post-ranking minScore filtering. `topK` is no longer a
     // per-request override per the hosted search contract (worlds-api#30 D1).
-    const candidateCount = this.options.candidateCount ??
-      this.options.limit ?? 100;
+    const candidateCount =
+      this.options.candidateCount ?? this.options.limit ?? 100;
 
     const { sql, args } = this.options.searchQueryBuilder.buildSearchQuery(
       request,

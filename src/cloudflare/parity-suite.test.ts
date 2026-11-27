@@ -34,42 +34,39 @@ async function createCloudflareSdkForParity() {
   return createCloudflareWorldsSdk({ database: substrate.database });
 }
 
-test(
-  "parity suite - cloudflare agrees with the in-memory reference on the corpus",
-  async () => {
-    const fixtures = parityCorpus.fixtures.filter(
-      (fixture) => fixture.name !== CHUNKER_DIVERGENT_FIXTURE,
-    );
+test("parity suite - cloudflare agrees with the in-memory reference on the corpus", async () => {
+  const fixtures = parityCorpus.fixtures.filter(
+    (fixture) => fixture.name !== CHUNKER_DIVERGENT_FIXTURE,
+  );
 
-    let report;
-    try {
-      report = await runParitySuite({
-        reference: () => createMemoryWorldsSdk(),
-        candidate: () => createCloudflareSdkForParity(),
-        fixtures,
-        strictSearchOrder: false,
-      });
-    } finally {
-      for (const dispose of disposers.splice(0)) {
-        await dispose();
-      }
+  let report;
+  try {
+    report = await runParitySuite({
+      reference: () => createMemoryWorldsSdk(),
+      candidate: () => createCloudflareSdkForParity(),
+      fixtures,
+      strictSearchOrder: false,
+    });
+  } finally {
+    for (const dispose of disposers.splice(0)) {
+      await dispose();
     }
+  }
 
-    assert.deepStrictEqual(
-      report.results.length,
-      fixtures.length + parityCorpus.replaceCases.length,
-      "every non-exempted corpus fixture and replace case runs on both",
-    );
-    assert.deepStrictEqual(
-      report.ok,
-      true,
-      report.results
-        .map(
-          (r) =>
-            `${r.name}: ${r.failures.join("; ")}` +
-            `${r.notes ? ` [notes: ${r.notes.join("; ")}]` : ""}`,
-        )
-        .join("\n"),
-    );
-  },
-);
+  assert.deepStrictEqual(
+    report.results.length,
+    fixtures.length + parityCorpus.replaceCases.length,
+    "every non-exempted corpus fixture and replace case runs on both",
+  );
+  assert.deepStrictEqual(
+    report.ok,
+    true,
+    report.results
+      .map(
+        (r) =>
+          `${r.name}: ${r.failures.join("; ")}` +
+          `${r.notes ? ` [notes: ${r.notes.join("; ")}]` : ""}`,
+      )
+      .join("\n"),
+  );
+});

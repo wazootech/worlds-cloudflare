@@ -42,11 +42,12 @@ test("worldId-scoped worlds infer independently", async () => {
       `${PREFIX}INSERT DATA { ex:Dog${name} rdfs:subClassOf ex:Animal${name} . ex:rex${name} a ex:Dog${name} . }`;
     await a.sparql({ query: insert("A") });
     await b.sparql({ query: insert("B") });
-    const counts = await substrate.connection.execute<
-      { world_id: string; derived: number; n: number }
-    >({
-      sql:
-        "SELECT world_id, derived, COUNT(*) AS n FROM quads GROUP BY world_id, derived ORDER BY world_id, derived",
+    const counts = await substrate.connection.execute<{
+      world_id: string;
+      derived: number;
+      n: number;
+    }>({
+      sql: "SELECT world_id, derived, COUNT(*) AS n FROM quads GROUP BY world_id, derived ORDER BY world_id, derived",
     });
     const byKey = Object.fromEntries(
       counts.rows.map((r) => [`${r.world_id}:${r.derived}`, Number(r.n)]),
@@ -63,10 +64,9 @@ test("worldId-scoped worlds infer independently", async () => {
 test("enabling inference on a database without quads.derived fails closed", async () => {
   const substrate = await createTestD1();
   try {
-    const legacy = new D1SchemaBuilder(32).buildD1QuadsTable().replace(
-      ", derived INTEGER NOT NULL DEFAULT 0",
-      "",
-    );
+    const legacy = new D1SchemaBuilder(32)
+      .buildD1QuadsTable()
+      .replace(", derived INTEGER NOT NULL DEFAULT 0", "");
     await substrate.connection.execute({ sql: legacy });
     await rejected(
       () =>

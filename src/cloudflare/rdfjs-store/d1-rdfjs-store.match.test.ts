@@ -32,12 +32,14 @@ test("D1RdfjsStore.match - all four terms bound returns exact quad", async () =>
     );
     await store.flush();
 
-    const results = await collectQuadsFromStream(store.match(
-      namedNode("urn:alice"),
-      namedNode("urn:knows"),
-      namedNode("urn:bob"),
-      namedNode("urn:graph1"),
-    ));
+    const results = await collectQuadsFromStream(
+      store.match(
+        namedNode("urn:alice"),
+        namedNode("urn:knows"),
+        namedNode("urn:bob"),
+        namedNode("urn:graph1"),
+      ),
+    );
 
     assert.deepStrictEqual(results.length, 1);
     assert.deepStrictEqual(results[0].subject.value, "urn:alice");
@@ -182,10 +184,7 @@ test("D1RdfjsStore.match - literal with language tag", async () => {
 
     assert.deepStrictEqual(results.length, 1);
     assert.deepStrictEqual(results[0].object.value, "hola");
-    assert.deepStrictEqual(
-      (results[0].object as rdfjs.Literal).language,
-      "es",
-    );
+    assert.deepStrictEqual((results[0].object as rdfjs.Literal).language, "es");
   } finally {
     await dispose();
   }

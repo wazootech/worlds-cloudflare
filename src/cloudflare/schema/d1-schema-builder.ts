@@ -33,9 +33,9 @@ export class D1SchemaBuilder {
       dimensions > D1_MAX_VECTOR_DIMENSIONS
     ) {
       throw new Error(
-        `vectorDimensions must be a finite integer in [1, ${D1_MAX_VECTOR_DIMENSIONS}], received: ${
-          String(vectorDimensions)
-        }`,
+        `vectorDimensions must be a finite integer in [1, ${D1_MAX_VECTOR_DIMENSIONS}], received: ${String(
+          vectorDimensions,
+        )}`,
       );
     }
     this.vectorDimensions = dimensions;

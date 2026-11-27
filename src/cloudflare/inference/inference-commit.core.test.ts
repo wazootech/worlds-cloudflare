@@ -15,7 +15,10 @@ test("inference is off by default: nothing is derived", async () => {
     );
     const all = await rows();
     assert.deepStrictEqual(all.length, 2);
-    assert.deepStrictEqual(all.every((r) => r[4] === 0), true);
+    assert.deepStrictEqual(
+      all.every((r) => r[4] === 0),
+      true,
+    );
   });
 });
 
@@ -26,8 +29,8 @@ test("enabled: insertions write derived rows that SPARQL can see", async () => {
     );
     const derived = (await rows()).filter((r) => r[4] === 1);
     assert.deepStrictEqual(
-      derived.some((r) =>
-        r[0] === "ex:rex" && r[1] === TYPE && r[2] === "ex:Animal"
+      derived.some(
+        (r) => r[0] === "ex:rex" && r[1] === TYPE && r[2] === "ex:Animal",
       ),
       true,
     );
@@ -56,7 +59,10 @@ test("enabled: deleting the premise removes the derived rows, never asserted one
       true,
     );
     assert.deepStrictEqual(
-      all.filter((r) => r[4] === 0).map((r) => r[0]).sort(),
+      all
+        .filter((r) => r[4] === 0)
+        .map((r) => r[0])
+        .sort(),
       ["ex:Dog", "ex:fido"],
     );
   });
@@ -71,11 +77,17 @@ test("enabled: a quad that is asserted and derived stays asserted", async () => 
     await update(`INSERT DATA { ex:rex a ex:Animal . }`);
     const find = async () =>
       (await rows()).filter((r) => r[0] === "ex:rex" && r[2] === "ex:Animal");
-    assert.deepStrictEqual((await find()).map((r) => r[4]), [0]);
+    assert.deepStrictEqual(
+      (await find()).map((r) => r[4]),
+      [0],
+    );
 
     // Removing the premise must not remove the asserted quad.
     await update(`DELETE DATA { ex:rex a ex:Dog . }`);
-    assert.deepStrictEqual((await find()).map((r) => r[4]), [0]);
+    assert.deepStrictEqual(
+      (await find()).map((r) => r[4]),
+      [0],
+    );
   });
 });
 
@@ -89,10 +101,13 @@ test("enabled: retracting an asserted quad that is still derivable keeps it as d
       }`,
     );
     await update(`DELETE DATA { ex:rex a ex:Animal . }`);
-    const kept = (await rows()).filter((r) =>
-      r[0] === "ex:rex" && r[2] === "ex:Animal"
+    const kept = (await rows()).filter(
+      (r) => r[0] === "ex:rex" && r[2] === "ex:Animal",
     );
-    assert.deepStrictEqual(kept.map((r) => r[4]), [1]);
+    assert.deepStrictEqual(
+      kept.map((r) => r[4]),
+      [1],
+    );
   });
 });
 
@@ -102,10 +117,13 @@ test("enabled: deleting a derived-only quad leaves it in place", async () => {
       `INSERT DATA { ex:Dog rdfs:subClassOf ex:Animal . ex:rex a ex:Dog . }`,
     );
     await update(`DELETE DATA { ex:rex a ex:Animal . }`);
-    const kept = (await rows()).filter((r) =>
-      r[0] === "ex:rex" && r[2] === "ex:Animal"
+    const kept = (await rows()).filter(
+      (r) => r[0] === "ex:rex" && r[2] === "ex:Animal",
     );
-    assert.deepStrictEqual(kept.map((r) => r[4]), [1]);
+    assert.deepStrictEqual(
+      kept.map((r) => r[4]),
+      [1],
+    );
   });
 });
 
@@ -119,8 +137,9 @@ test("enabled, per-graph: a cross-graph entailment is listed in the derived grap
     );
     const derived = (await rows()).filter((r) => r[4] === 1);
     assert.deepStrictEqual(
-      derived.some((r) =>
-        r[0] === "ex:rex" && r[2] === "ex:Animal" && r[3] === DERIVED_GRAPH
+      derived.some(
+        (r) =>
+          r[0] === "ex:rex" && r[2] === "ex:Animal" && r[3] === DERIVED_GRAPH,
       ),
       true,
     );
@@ -139,8 +158,8 @@ test("enabled, union: the entailment is listed in the default graph", async () =
       );
       const derived = (await rows()).filter((r) => r[4] === 1);
       assert.deepStrictEqual(
-        derived.some((r) =>
-          r[0] === "ex:rex" && r[2] === "ex:Animal" && r[3] === ""
+        derived.some(
+          (r) => r[0] === "ex:rex" && r[2] === "ex:Animal" && r[3] === "",
         ),
         true,
       );

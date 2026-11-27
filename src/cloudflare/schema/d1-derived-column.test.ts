@@ -60,13 +60,13 @@ test("a pre-derived database fails the derived check until the migration runs", 
   const substrate = await createTestD1();
   try {
     // The canonical DDL as it was before this column existed.
-    const legacyQuads = new D1SchemaBuilder(32).buildD1QuadsTable().replace(
-      ", derived INTEGER NOT NULL DEFAULT 0",
-      "",
-    );
+    const legacyQuads = new D1SchemaBuilder(32)
+      .buildD1QuadsTable()
+      .replace(", derived INTEGER NOT NULL DEFAULT 0", "");
     await substrate.connection.execute({ sql: legacyQuads });
     await substrate.connection.execute({
-      sql: "INSERT INTO quads (quad_id, s, s_type, p, o, o_type, g, g_type) " +
+      sql:
+        "INSERT INTO quads (quad_id, s, s_type, p, o, o_type, g, g_type) " +
         "VALUES ('old', 's', 'NamedNode', 'p', 'o', 'NamedNode', '', 'DefaultGraph')",
     });
 
@@ -84,8 +84,11 @@ test("a pre-derived database fails the derived check until the migration runs", 
       false,
     );
 
-    const sql = (await readFile(MIGRATION, "utf8")).split("\n")
-      .filter((line) => !line.startsWith("--")).join("\n").trim();
+    const sql = (await readFile(MIGRATION, "utf8"))
+      .split("\n")
+      .filter((line) => !line.startsWith("--"))
+      .join("\n")
+      .trim();
     await substrate.connection.execute({ sql });
 
     const after = await checkD1SchemaCompatibility(substrate.connection, {
@@ -109,8 +112,7 @@ test("a pre-derived database fails the derived check until the migration runs", 
 test("inferred rows never overwrite or delete asserted rows", async () => {
   const substrate = await createTestD1();
   try {
-    await new D1RdfjsStore({ connection: substrate.connection })
-      .ensureSchema();
+    await new D1RdfjsStore({ connection: substrate.connection }).ensureSchema();
     const run = async (
       statements: Array<{ sql: string; args?: unknown[] }>,
     ) => {
@@ -127,14 +129,13 @@ test("inferred rows never overwrite or delete asserted rows", async () => {
     );
     // Deleting both ids as derived only removes the inferred one.
     await run([buildDeleteDerivedQuadsByQuadIds(["asserted", "inferred"])]);
-    const left = await substrate.connection.execute<
-      { quad_id: string; derived: number }
-    >({ sql: "SELECT quad_id, derived FROM quads ORDER BY quad_id" });
+    const left = await substrate.connection.execute<{
+      quad_id: string;
+      derived: number;
+    }>({ sql: "SELECT quad_id, derived FROM quads ORDER BY quad_id" });
     assert.deepStrictEqual(
       left.rows.map((r) => [r.quad_id, Number(r.derived)]),
-      [
-        ["asserted", 0],
-      ],
+      [["asserted", 0]],
     );
 
     // Replacing an inferred row with an asserted one promotes it.
@@ -152,7 +153,10 @@ test("inferred rows never overwrite or delete asserted rows", async () => {
         assertedOnly: true,
       }),
     );
-    assert.deepStrictEqual(existing.rows.map((r) => r.id), ["asserted"]);
+    assert.deepStrictEqual(
+      existing.rows.map((r) => r.id),
+      ["asserted"],
+    );
   } finally {
     await substrate.dispose();
   }

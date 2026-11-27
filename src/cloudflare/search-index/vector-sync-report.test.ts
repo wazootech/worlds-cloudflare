@@ -79,10 +79,12 @@ async function createContext(wireVectors = true) {
     });
   const chunkCount = async () =>
     Number(
-      (await substrate.connection.execute({
-        sql: "SELECT COUNT(*) AS n FROM chunks",
-        args: [],
-      })).rows[0]["n"],
+      (
+        await substrate.connection.execute({
+          sql: "SELECT COUNT(*) AS n FROM chunks",
+          args: [],
+        })
+      ).rows[0]["n"],
     );
   return {
     searchIndex,

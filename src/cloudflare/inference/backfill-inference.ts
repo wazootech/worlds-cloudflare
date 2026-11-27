@@ -79,8 +79,8 @@ export async function backfillInference(
 
   const asserted = await loadAssertedQuads(connection, {
     worldId,
-    maxAssertedQuads: options.inference?.maxAssertedQuads ??
-      DEFAULT_MAX_ASSERTED_QUADS,
+    maxAssertedQuads:
+      options.inference?.maxAssertedQuads ?? DEFAULT_MAX_ASSERTED_QUADS,
     pendingInsertions: 0,
   });
   const plan = planInference({

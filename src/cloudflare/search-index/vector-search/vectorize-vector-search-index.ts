@@ -142,10 +142,10 @@ export class VectorizeVectorSearchIndex implements VectorSearchIndex {
 function base64Url(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(
-    /=+$/,
-    "",
-  );
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 function metadataToRecord(
@@ -155,11 +155,9 @@ function metadataToRecord(
     return undefined;
   }
   const result: Record<string, string> = {};
-  for (
-    const [key, value] of Object.entries(
-      metadata as Record<string, unknown>,
-    )
-  ) {
+  for (const [key, value] of Object.entries(
+    metadata as Record<string, unknown>,
+  )) {
     result[key] = String(value);
   }
   return result;

@@ -79,9 +79,9 @@ export function checkVectorizeIndex(
   assertValidExpectation(expectation.name, dimensions);
   if (!index) {
     return [
-      `index "${expectation.name}" does not exist; provision it with:\n  ${
-        planVectorizeProvisioning(expectation).join("\n  ")
-      }`,
+      `index "${expectation.name}" does not exist; provision it with:\n  ${planVectorizeProvisioning(
+        expectation,
+      ).join("\n  ")}`,
     ];
   }
   const problems: string[] = [];
@@ -97,8 +97,9 @@ export function checkVectorizeIndex(
       `index "${expectation.name}" uses metric ${observedMetric}, expected ${VECTORIZE_METRIC}; the metric is immutable, so the index must be recreated`,
     );
   }
-  const filterable = metadataIndexes.find((row) =>
-    (row.propertyName ?? row.property_name) === VECTORIZE_FILTERABLE_PROPERTY
+  const filterable = metadataIndexes.find(
+    (row) =>
+      (row.propertyName ?? row.property_name) === VECTORIZE_FILTERABLE_PROPERTY,
   );
   if (!filterable) {
     problems.push(

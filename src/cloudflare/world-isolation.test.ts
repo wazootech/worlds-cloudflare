@@ -133,9 +133,11 @@ test("worldId serializes concurrent writes without cross-world leakage", async (
     assert.deepStrictEqual(await count(sdkA), 1);
     assert.deepStrictEqual(await count(sdkB), 1);
 
-    const raw = await substrate.database.prepare(
-      "SELECT world_id, COUNT(*) AS count FROM quads GROUP BY world_id ORDER BY world_id",
-    ).all<{ world_id: string; count: number }>();
+    const raw = await substrate.database
+      .prepare(
+        "SELECT world_id, COUNT(*) AS count FROM quads GROUP BY world_id ORDER BY world_id",
+      )
+      .all<{ world_id: string; count: number }>();
     assert.deepStrictEqual(
       raw.results.map((row) => [row.world_id, Number(row.count)]),
       [
@@ -196,7 +198,8 @@ test("0002 rebuilds a legacy quads table with a world-scoped key and keeps its r
   const substrate = await createTestD1();
   try {
     const modern = new D1SchemaBuilder(32, { worldId: worldA });
-    const legacy = modern.buildD1QuadsTable()
+    const legacy = modern
+      .buildD1QuadsTable()
       .replace("quad_id TEXT,", "quad_id TEXT PRIMARY KEY,")
       .replace(", PRIMARY KEY (world_id, quad_id)", "");
     // Create the full current schema, then swap quads for its legacy shape.
@@ -207,8 +210,7 @@ test("0002 rebuilds a legacy quads table with a world-scoped key and keeps its r
     await substrate.connection.execute({ sql: "DROP TABLE quads" });
     await substrate.connection.execute({ sql: legacy });
     await substrate.connection.execute({
-      sql:
-        "INSERT INTO quads (quad_id, s, s_type, p, o, o_type, g, g_type, world_id) VALUES ('q1','urn:s','NamedNode','urn:p','urn:o','NamedNode','','DefaultGraph','world-a')",
+      sql: "INSERT INTO quads (quad_id, s, s_type, p, o, o_type, g, g_type, world_id) VALUES ('q1','urn:s','NamedNode','urn:p','urn:o','NamedNode','','DefaultGraph','world-a')",
     });
 
     // A Worker deployed before the migration still starts on the legacy key.
@@ -224,18 +226,26 @@ test("0002 rebuilds a legacy quads table with a world-scoped key and keeps its r
       ),
       "utf8",
     );
-    const statements = migration.split("\n").filter((line) =>
-      !line.startsWith("--")
-    ).join("\n").split(/;\s*\n/).map((s) => s.trim()).filter(Boolean);
+    const statements = migration
+      .split("\n")
+      .filter((line) => !line.startsWith("--"))
+      .join("\n")
+      .split(/;\s*\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
     for (const sql of statements) {
       await substrate.connection.execute({ sql });
     }
 
-    const columns = await substrate.connection.execute<
-      { name: string; pk: number }
-    >({ sql: "PRAGMA table_info(quads)" });
+    const columns = await substrate.connection.execute<{
+      name: string;
+      pk: number;
+    }>({ sql: "PRAGMA table_info(quads)" });
     assert.deepStrictEqual(
-      columns.rows.filter((c) => Number(c.pk) > 0).map((c) => c.name).sort(),
+      columns.rows
+        .filter((c) => Number(c.pk) > 0)
+        .map((c) => c.name)
+        .sort(),
       ["quad_id", "world_id"],
     );
     const rows = await substrate.connection.execute<{ n: number }>({
@@ -245,8 +255,7 @@ test("0002 rebuilds a legacy quads table with a world-scoped key and keeps its r
 
     // The same quad id may now exist in another world.
     await substrate.connection.execute({
-      sql:
-        "INSERT INTO quads (quad_id, s, s_type, p, o, o_type, g, g_type, world_id) VALUES ('q1','urn:s','NamedNode','urn:p','urn:o','NamedNode','','DefaultGraph','world-b')",
+      sql: "INSERT INTO quads (quad_id, s, s_type, p, o, o_type, g, g_type, world_id) VALUES ('q1','urn:s','NamedNode','urn:p','urn:o','NamedNode','','DefaultGraph','world-b')",
     });
     await createCloudflareWorldsSdk({
       database: substrate.database,

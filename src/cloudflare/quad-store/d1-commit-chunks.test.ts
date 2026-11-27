@@ -29,9 +29,11 @@ async function setup() {
   });
   const chunkCount = async () =>
     Number(
-      (await substrate.connection.execute({
-        sql: "SELECT COUNT(*) AS n FROM chunks",
-      })).rows[0]!.n,
+      (
+        await substrate.connection.execute({
+          sql: "SELECT COUNT(*) AS n FROM chunks",
+        })
+      ).rows[0]!.n,
     );
   return { substrate, store, quadStore, chunkCount };
 }
@@ -41,7 +43,10 @@ test("deleting and re-adding a quad in one patch replaces its chunk row instead 
   try {
     await t.quadStore.createTransaction().addQuads([fact]).commit();
     assert.deepStrictEqual(await t.chunkCount(), 1);
-    await t.quadStore.createTransaction().removeQuads([fact]).addQuads([fact])
+    await t.quadStore
+      .createTransaction()
+      .removeQuads([fact])
+      .addQuads([fact])
       .commit();
     assert.deepStrictEqual((await t.store.getQuads()).length, 1);
     assert.deepStrictEqual(await t.chunkCount(), 1);

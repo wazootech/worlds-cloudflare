@@ -45,8 +45,8 @@ export function toProjectionOptions(
       ? options.embeddingService
       : undefined,
     ftsValueOf: buildChunkFtsValue,
-    vectorDimensions: options.vectorDimensions ??
-      options.searchQueryBuilder.vectorDimensions,
+    vectorDimensions:
+      options.vectorDimensions ?? options.searchQueryBuilder.vectorDimensions,
   };
 }
 
@@ -54,8 +54,9 @@ export function toProjectionOptions(
 export function isFullRebuild(filter: QuadFilter): boolean {
   const narrows = (criteria: QuadFilter["include"]) =>
     Boolean(
-      criteria?.subjects?.length || criteria?.predicates?.length ||
-        criteria?.graphs?.length,
+      criteria?.subjects?.length ||
+      criteria?.predicates?.length ||
+      criteria?.graphs?.length,
     );
   return !narrows(filter.include) && !narrows(filter.exclude);
 }

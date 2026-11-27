@@ -67,10 +67,8 @@ async function createImportStore(dims: number) {
 }
 
 function quadsOf(count: number) {
-  return Array.from(
-    { length: count },
-    (_, i) =>
-      quad(namedNode(`urn:s:${i}`), namedNode("urn:p"), literal(`v ${i}`)),
+  return Array.from({ length: count }, (_, i) =>
+    quad(namedNode(`urn:s:${i}`), namedNode("urn:p"), literal(`v ${i}`)),
   );
 }
 
@@ -92,9 +90,8 @@ async function chunkCount(connection: D1ConnectionDriver): Promise<number> {
  * about 3 MB: one atomic batch (the 750 default sent 375+ quads to the fallback).
  */
 test("an import of 400 quads with 384-dim vectors is one atomic batch() under the defaults", async () => {
-  const { substrate, connection, store, quadStore } = await createImportStore(
-    384,
-  );
+  const { substrate, connection, store, quadStore } =
+    await createImportStore(384);
   try {
     await quadStore.createTransaction().addQuads(quadsOf(400)).commit();
     assert.deepStrictEqual(connection.batches.length, 1);
@@ -109,9 +106,8 @@ test("an import of 400 quads with 384-dim vectors is one atomic batch() under th
 });
 
 test("an import of 1,536-dim vectors above the byte budget takes the chunked fallback, every batch under budget", async () => {
-  const { substrate, connection, store, quadStore } = await createImportStore(
-    1536,
-  );
+  const { substrate, connection, store, quadStore } =
+    await createImportStore(1536);
   try {
     // About 800 chunk rows of ~25 KB estimated: over 16 MiB, under 2,000 statements.
     await quadStore.createTransaction().addQuads(quadsOf(800)).commit();
@@ -128,9 +124,8 @@ test("an import of 1,536-dim vectors above the byte budget takes the chunked fal
 });
 
 test("a failed chunked import above the byte budget removes what the earlier batches wrote", async () => {
-  const { substrate, connection, store, quadStore } = await createImportStore(
-    1536,
-  );
+  const { substrate, connection, store, quadStore } =
+    await createImportStore(1536);
   try {
     connection.failOnBatch = 2;
     let failure: unknown;

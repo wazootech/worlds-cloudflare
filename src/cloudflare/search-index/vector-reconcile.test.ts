@@ -74,73 +74,67 @@ function vectorIdFor(subject: string, text: string) {
   });
 }
 
-test(
-  "replace import with incremental projection purges stale vectors (#71 item 3)",
-  async () => {
-    const { quadStore, vectorSearch, dispose } = await createContext();
-    try {
-      await quadStore.import({
-        source: {
-          kind: "quads",
-          quads: [quadText("urn:a", "old content")],
-        },
-      });
-      const idA = await vectorIdFor("urn:a", "old content");
-      assert.deepStrictEqual(vectorSearch.has(idA), true);
+test("replace import with incremental projection purges stale vectors (#71 item 3)", async () => {
+  const { quadStore, vectorSearch, dispose } = await createContext();
+  try {
+    await quadStore.import({
+      source: {
+        kind: "quads",
+        quads: [quadText("urn:a", "old content")],
+      },
+    });
+    const idA = await vectorIdFor("urn:a", "old content");
+    assert.deepStrictEqual(vectorSearch.has(idA), true);
 
-      await quadStore.import({
-        mode: "replace",
-        source: {
-          kind: "quads",
-          quads: [quadText("urn:b", "new content")],
-        },
-      });
+    await quadStore.import({
+      mode: "replace",
+      source: {
+        kind: "quads",
+        quads: [quadText("urn:b", "new content")],
+      },
+    });
 
-      const idB = await vectorIdFor("urn:b", "new content");
-      assert.deepStrictEqual(vectorSearch.has(idA), false);
-      assert.deepStrictEqual(vectorSearch.has(idB), true);
-      assert.deepStrictEqual(vectorSearch.size, 1);
-    } finally {
-      await dispose();
-    }
-  },
-);
+    const idB = await vectorIdFor("urn:b", "new content");
+    assert.deepStrictEqual(vectorSearch.has(idA), false);
+    assert.deepStrictEqual(vectorSearch.has(idB), true);
+    assert.deepStrictEqual(vectorSearch.size, 1);
+  } finally {
+    await dispose();
+  }
+});
 
-test(
-  "reindex reconciles vectors for quads removed without projection (#71 item 3)",
-  async () => {
-    const { quadStore, store, projector, vectorSearch, dispose } =
-      await createContext();
-    try {
-      await quadStore.import({
-        source: {
-          kind: "quads",
-          quads: [
-            quadText("urn:a", "stale after delete"),
-            quadText("urn:b", "survivor"),
-          ],
-        },
-      });
-      const idA = await vectorIdFor("urn:a", "stale after delete");
-      const idB = await vectorIdFor("urn:b", "survivor");
-      assert.deepStrictEqual(vectorSearch.size, 2);
+test("reindex reconciles vectors for quads removed without projection (#71 item 3)", async () => {
+  const { quadStore, store, projector, vectorSearch, dispose } =
+    await createContext();
+  try {
+    await quadStore.import({
+      source: {
+        kind: "quads",
+        quads: [
+          quadText("urn:a", "stale after delete"),
+          quadText("urn:b", "survivor"),
+        ],
+      },
+    });
+    const idA = await vectorIdFor("urn:a", "stale after delete");
+    const idB = await vectorIdFor("urn:b", "survivor");
+    assert.deepStrictEqual(vectorSearch.size, 2);
 
-      // Delete quad A through the quad store: chunk rows go with it, but the
-      // deletion path never touched vectors (the bug). The reindex that
-      // follows is the repair pass.
-      const transaction = quadStore.createTransaction();
-      transaction.delete(quadText("urn:a", "stale after delete"));
-      await transaction.commit({ importMode: "merge" });
-      assert.deepStrictEqual(vectorSearch.has(idA), true);
+    // Delete quad A through the quad store: chunk rows go with it, but the
+    // deletion path never touched vectors (the bug). The reindex that
+    // follows is the repair pass.
+    const transaction = quadStore.createTransaction();
+    transaction.delete(quadText("urn:a", "stale after delete"));
+    await transaction.commit({ importMode: "merge" });
+    assert.deepStrictEqual(vectorSearch.has(idA), true);
 
-      await projector.reindexAll();
+    await projector.reindexAll();
 
-      assert.deepStrictEqual(vectorSearch.has(idA), false);
-      assert.deepStrictEqual(vectorSearch.has(idB), true);
-      assert.deepStrictEqual(vectorSearch.size, 1);
-      assert.deepStrictEqual((await store.getQuads()).length, 1);
-    } finally {
-      await dispose();
-    }
-  },
-);
+    assert.deepStrictEqual(vectorSearch.has(idA), false);
+    assert.deepStrictEqual(vectorSearch.has(idB), true);
+    assert.deepStrictEqual(vectorSearch.size, 1);
+    assert.deepStrictEqual((await store.getQuads()).length, 1);
+  } finally {
+    await dispose();
+  }
+});

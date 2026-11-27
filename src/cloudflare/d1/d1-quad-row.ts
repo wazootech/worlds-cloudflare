@@ -54,12 +54,14 @@ export function buildInsertRow(quad: rdfjs.Quad, id: string): InsertQuadRow {
     p: quad.predicate.value,
     o: object.value,
     o_type: object.termType,
-    o_datatype: object.termType === "Literal"
-      ? (object as rdfjs.Literal).datatype?.value ?? null
-      : null,
-    o_lang: object.termType === "Literal"
-      ? (object as rdfjs.Literal).language || null
-      : null,
+    o_datatype:
+      object.termType === "Literal"
+        ? ((object as rdfjs.Literal).datatype?.value ?? null)
+        : null,
+    o_lang:
+      object.termType === "Literal"
+        ? (object as rdfjs.Literal).language || null
+        : null,
     g: graph.value,
     g_type: graph.termType,
   };

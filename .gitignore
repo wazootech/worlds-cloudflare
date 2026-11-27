@@ -2,3 +2,5 @@ node_modules
 *.db
 .env
 *.log
+# jsr publish regenerates this; Bun uses bun.lock.
+deno.lock

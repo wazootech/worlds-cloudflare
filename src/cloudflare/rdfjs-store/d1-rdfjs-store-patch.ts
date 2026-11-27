@@ -43,12 +43,9 @@ export async function applyD1Patch(
 
   if (targetedDeletions.length > 0) {
     const deletionIds = await hashQuads(targetedDeletions);
-    await stageChunked(
-      executor,
-      deletionIds,
-      deps.lookupChunkSize,
-      (chunk) => [buildDeleteQuadsByQuadIds(chunk, deps.worldId)],
-    );
+    await stageChunked(executor, deletionIds, deps.lookupChunkSize, (chunk) => [
+      buildDeleteQuadsByQuadIds(chunk, deps.worldId),
+    ]);
   }
 
   if (targetedInsertions.length > 0) {
@@ -129,10 +126,12 @@ export async function insertD1Quad(
   quad: rdfjs.Quad,
 ): Promise<void> {
   await connection.batch(
-    buildBulkInsertQuads([{
-      ...(await quadToInsertRow(quad)),
-      world_id: worldId,
-    }]),
+    buildBulkInsertQuads([
+      {
+        ...(await quadToInsertRow(quad)),
+        world_id: worldId,
+      },
+    ]),
   );
 }
 
@@ -143,7 +142,5 @@ export async function deleteD1Quad(
   quad: rdfjs.Quad,
 ): Promise<void> {
   const [id] = await hashQuads([quad]);
-  await connection.batch([
-    buildDeleteQuadsByQuadIds([id], worldId),
-  ]);
+  await connection.batch([buildDeleteQuadsByQuadIds([id], worldId)]);
 }

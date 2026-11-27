@@ -20,9 +20,10 @@ export function buildSelectExistingQuadIds(
 }
 
 /** buildCountAssertedQuads counts the asserted (not inferred) rows. */
-export function buildCountAssertedQuads(
-  worldId?: string,
-): { sql: string; args: string[] } {
+export function buildCountAssertedQuads(worldId?: string): {
+  sql: string;
+  args: string[];
+} {
   return {
     sql: `SELECT COUNT(*) AS count FROM quads WHERE derived = 0${
       worldId ? " AND world_id = ?" : ""
@@ -48,10 +49,9 @@ export function buildSelectAssertedQuadsPage(
   }
   args.push(String(Math.max(1, Math.floor(pageOptions.limit))));
   return {
-    sql:
-      `SELECT quad_id AS id, s, s_type, p, o, o_type, o_datatype, o_lang, g, g_type FROM quads WHERE ${
-        conditions.join(" AND ")
-      } ORDER BY quad_id ASC LIMIT ?`,
+    sql: `SELECT quad_id AS id, s, s_type, p, o, o_type, o_datatype, o_lang, g, g_type FROM quads WHERE ${conditions.join(
+      " AND ",
+    )} ORDER BY quad_id ASC LIMIT ?`,
     args,
   };
 }
@@ -72,9 +72,8 @@ export function buildMatchQuadsQuery(
     args.push(pageOptions.afterQuadId);
   }
 
-  const whereClause = conditions.length > 0
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
+  const whereClause =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   let limitClause = "";
   if (pageOptions?.limit != null) {
@@ -83,8 +82,7 @@ export function buildMatchQuadsQuery(
   }
 
   return {
-    sql:
-      `SELECT quad_id AS id, s, s_type, p, o, o_type, o_datatype, o_lang, g, g_type FROM quads ${whereClause} ORDER BY quad_id ASC${limitClause}`,
+    sql: `SELECT quad_id AS id, s, s_type, p, o, o_type, o_datatype, o_lang, g, g_type FROM quads ${whereClause} ORDER BY quad_id ASC${limitClause}`,
     args,
   };
 }
@@ -98,9 +96,8 @@ export function buildCountQuadsQuery(
     conditions.push("world_id = ?");
     args.push(worldId);
   }
-  const whereClause = conditions.length > 0
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
+  const whereClause =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   return {
     sql: `SELECT COUNT(*) AS count FROM quads ${whereClause}`,

@@ -6,9 +6,10 @@ import type { WorldsSdkInterface } from "@worlds/sdk";
 
 const NQUADS = "application/n-quads";
 
-async function createTestWorldsSdk(): Promise<
-  { sdk: WorldsSdkInterface; dispose(): Promise<void> }
-> {
+async function createTestWorldsSdk(): Promise<{
+  sdk: WorldsSdkInterface;
+  dispose(): Promise<void>;
+}> {
   const substrate = await createTestD1();
   const sdk = await createCloudflareWorldsSdk({ database: substrate.database });
   return { sdk, dispose: substrate.dispose };
@@ -72,8 +73,7 @@ test("createCloudflareWorldsSdk - keyword search over imported literals", async 
     await sdk.import({
       source: {
         kind: "serialized",
-        data:
-          '<urn:ethan> <urn:knows> "Ethan writes robust retrieval infrastructure" .\n',
+        data: '<urn:ethan> <urn:knows> "Ethan writes robust retrieval infrastructure" .\n',
         contentType: NQUADS,
       },
     });

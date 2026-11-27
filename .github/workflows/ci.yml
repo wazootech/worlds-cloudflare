@@ -9,29 +9,11 @@ on:
       - main
 
 jobs:
+  # Format, lint, type check, manifest check and tests all run on Bun
+  # (bun run ci). Bun floats on 1.x on purpose so a Bun regression surfaces
+  # early. The publish dry run goes through the jsr CLI (a devDependency that
+  # bundles its own publisher), so no Deno is installed anywhere in CI.
   ci:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
-        with:
-          cache: true
-          deno-version: v2.9.8
-      - name: Install dependencies
-        run: deno ci
-      - name: Run CI checks
-        run: deno task ci
-      - name: Reject legacy platform identity names
-        run: |
-          if grep -R -n -E '\buid\b|world_uid|worldUid|_uid\b' src/; then
-            echo "Legacy platform identity found."
-            exit 1
-          fi
-
-  # The same tests must also pass on Bun (Deno -> Bun migration,
-  # wazootech/workspace#50). Bun floats on 1.x on purpose so a Bun regression
-  # surfaces early. Format, lint and type check stay on Deno until the cutover.
-  bun:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,4 +21,13 @@ jobs:
         with:
           bun-version: "1.x"
       - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run test
+      - name: Run CI checks
+        run: bun run ci
+      - name: Publish dry run (smoke)
+        run: bun run publish:dry
+      - name: Reject legacy platform identity names
+        run: |
+          if grep -R -n -E '\buid\b|world_uid|worldUid|_uid\b' src/; then
+            echo "Legacy platform identity found."
+            exit 1
+          fi

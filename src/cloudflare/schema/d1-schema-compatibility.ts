@@ -105,10 +105,8 @@ export async function checkD1SchemaCompatibility(
       versionPrimaryKeys[0]?.name !==
         REQUIRED_PRIMARY_KEYS[SCHEMA_VERSION_TABLE]![0]![0]
     ) {
-      const found = versionPrimaryKeys.map((column) =>
-        column.name
-      ).join(", ") ||
-        "none";
+      const found =
+        versionPrimaryKeys.map((column) => column.name).join(", ") || "none";
       issues.push({
         table: SCHEMA_VERSION_TABLE,
         detail: `expected primary key ${
@@ -118,21 +116,21 @@ export async function checkD1SchemaCompatibility(
     }
     if (versionColumns.has("version")) {
       const versionResult = await connection.execute<{ version: number }>({
-        sql:
-          `SELECT version FROM ${SCHEMA_VERSION_TABLE} ORDER BY version DESC LIMIT 1`,
+        sql: `SELECT version FROM ${SCHEMA_VERSION_TABLE} ORDER BY version DESC LIMIT 1`,
       });
-      schemaVersion = versionResult.rows[0]?.version == null
-        ? null
-        : Number(versionResult.rows[0].version);
+      schemaVersion =
+        versionResult.rows[0]?.version == null
+          ? null
+          : Number(versionResult.rows[0].version);
     }
   }
   if (
-    schemaVersion !== null && schemaVersion !== D1_DATA_PLANE_SCHEMA_VERSION
+    schemaVersion !== null &&
+    schemaVersion !== D1_DATA_PLANE_SCHEMA_VERSION
   ) {
     issues.push({
       table: SCHEMA_VERSION_TABLE,
-      detail:
-        `expected schema version ${D1_DATA_PLANE_SCHEMA_VERSION}, found ${schemaVersion}`,
+      detail: `expected schema version ${D1_DATA_PLANE_SCHEMA_VERSION}, found ${schemaVersion}`,
     });
   }
   const requiredColumns = Object.fromEntries(
@@ -170,7 +168,8 @@ export async function checkD1SchemaCompatibility(
     // A world-scoped database opened without a worldId would run unscoped SQL
     // over the shared table: fail closed instead of crossing worlds.
     if (
-      options.worldId === undefined && table === "quads" &&
+      options.worldId === undefined &&
+      table === "quads" &&
       actual.has("world_id")
     ) {
       issues.push({
@@ -188,17 +187,20 @@ export async function checkD1SchemaCompatibility(
       (column) => Number(column.pk) > 0,
     );
     const expectedPrimaryKeys = REQUIRED_PRIMARY_KEYS[table] ?? [];
-    const actualKey = primaryKeys.map((column) => column.name).sort().join(",");
+    const actualKey = primaryKeys
+      .map((column) => column.name)
+      .sort()
+      .join(",");
     if (
-      !expectedPrimaryKeys.some((key) =>
-        [...key].sort().join(",") === actualKey
+      !expectedPrimaryKeys.some(
+        (key) => [...key].sort().join(",") === actualKey,
       )
     ) {
       const expectedPrimaryKey = expectedPrimaryKeys
         .map((key) => key.join(" + "))
         .join(" or ");
-      const found = primaryKeys.map((column) => column.name).join(", ") ||
-        "none";
+      const found =
+        primaryKeys.map((column) => column.name).join(", ") || "none";
       issues.push({
         table,
         detail: `expected primary key ${expectedPrimaryKey}, found ${found}`,
@@ -206,8 +208,7 @@ export async function checkD1SchemaCompatibility(
     }
   }
   const ftsTableResult = await connection.execute<{ sql: string }>({
-    sql:
-      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'chunks_fts'",
+    sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'chunks_fts'",
   });
   const ftsSql = ftsTableResult.rows[0]?.sql;
   if (!ftsSql) {

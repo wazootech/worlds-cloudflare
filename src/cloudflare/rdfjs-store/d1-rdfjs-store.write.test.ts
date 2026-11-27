@@ -68,16 +68,12 @@ test("D1RdfjsStore.createTransaction - commit persists the patch", async () => {
   const { store, dispose } = await createTestD1Store();
   try {
     const transaction = store.createTransaction();
-    transaction.add(DataFactory.quad(
-      namedNode("urn:a"),
-      namedNode("urn:p"),
-      literal("o1"),
-    ));
-    transaction.add(DataFactory.quad(
-      namedNode("urn:b"),
-      namedNode("urn:p"),
-      literal("o2"),
-    ));
+    transaction.add(
+      DataFactory.quad(namedNode("urn:a"), namedNode("urn:p"), literal("o1")),
+    );
+    transaction.add(
+      DataFactory.quad(namedNode("urn:b"), namedNode("urn:p"), literal("o2")),
+    );
     await transaction.commit();
     await store.flush();
 
@@ -91,11 +87,9 @@ test("D1RdfjsStore.createTransaction - rollback discards buffered writes", async
   const { store, dispose } = await createTestD1Store();
   try {
     const transaction = store.createTransaction();
-    transaction.add(DataFactory.quad(
-      namedNode("urn:a"),
-      namedNode("urn:p"),
-      literal("o1"),
-    ));
+    transaction.add(
+      DataFactory.quad(namedNode("urn:a"), namedNode("urn:p"), literal("o1")),
+    );
     transaction.rollback();
     await store.flush();
 

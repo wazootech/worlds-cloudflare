@@ -4,8 +4,7 @@
  * `wrangler vectorize get` and `list-metadata-index`. Exit code 1 on any
  * problem, so it can gate a deploy or a human's post-provision checklist.
  *
- *   deno task vectorize:verify <index-name> [--dimensions 1536]
- *   bun scripts/verify-vectorize.ts <index-name> [--dimensions 1536]
+ *   bun run vectorize:verify <index-name> [--dimensions 1536]
  *
  * Requires wrangler credentials for the account that owns the index
  * (CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID or `wrangler login`).
@@ -19,9 +18,11 @@ import {
   type VectorizeMetadataIndexObservation,
 } from "../src/cloudflare/search-index/vector-search/vectorize-provisioning.ts";
 
-function wrangler(
-  args: string[],
-): { ok: boolean; stdout: string; stderr: string } {
+function wrangler(args: string[]): {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+} {
   // npx is a .cmd shim on Windows, which only a shell can launch.
   const out = spawnSync("npx", ["wrangler", ...args], {
     encoding: "utf8",
@@ -54,7 +55,7 @@ if (dimIndex >= 0) {
 const name = args[0];
 if (!name) {
   console.error(
-    "usage: deno task vectorize:verify <index-name> [--dimensions N]",
+    "usage: bun run vectorize:verify <index-name> [--dimensions N]",
   );
   process.exit(2);
 }
@@ -64,12 +65,7 @@ let index: VectorizeIndexObservation | undefined;
 let metadataIndexes: VectorizeMetadataIndexObservation[] = [];
 if (got.ok) {
   index = parseJson<VectorizeIndexObservation>(got.stdout);
-  const listed = wrangler([
-    "vectorize",
-    "list-metadata-index",
-    name,
-    "--json",
-  ]);
+  const listed = wrangler(["vectorize", "list-metadata-index", name, "--json"]);
   if (!listed.ok) {
     console.error(listed.stderr || listed.stdout);
     process.exit(1);

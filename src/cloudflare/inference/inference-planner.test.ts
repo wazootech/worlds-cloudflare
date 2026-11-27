@@ -90,12 +90,7 @@ test("per-graph mode: a cross-graph entailment lands in the derived graph", () =
     deletions: [],
     insertions: [data],
   });
-  const crossGraph = quad(
-    ex("rex"),
-    RDF_TYPE,
-    ex("Animal"),
-    DERIVED_GRAPH,
-  );
+  const crossGraph = quad(ex("rex"), RDF_TYPE, ex("Animal"), DERIVED_GRAPH);
   assert.deepStrictEqual(
     keys(plan.derivedToAdd).includes(quadKey(crossGraph)),
     true,
@@ -120,10 +115,7 @@ test("union mode lists the entailment in the default graph", () => {
 test("an inconsistency in the new closure is reported", () => {
   const DISJOINT = namedNode("http://www.w3.org/2002/07/owl#disjointWith");
   const plan = planInference({
-    assertedBefore: [
-      quad(ex("Cat"), DISJOINT, ex("Dog"), defaultGraph()),
-      rex,
-    ],
+    assertedBefore: [quad(ex("Cat"), DISJOINT, ex("Dog"), defaultGraph()), rex],
     deletions: [],
     insertions: [quad(ex("rex"), RDF_TYPE, ex("Cat"), defaultGraph())],
   });

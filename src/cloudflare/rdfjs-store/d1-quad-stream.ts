@@ -3,7 +3,6 @@ import type * as rdfjs from "@rdfjs/types";
 // The implementation listener is any-parameterized so the typed overloads
 // below remain compatible with it (Node's own EventEmitter typings do the
 // same); the overloads are what consumers see.
-// deno-lint-ignore no-explicit-any
 type Listener = (...args: any[]) => void;
 
 /**
@@ -190,7 +189,7 @@ export class D1QuadStream implements rdfjs.Stream<rdfjs.Quad> {
     if (!list || list.length === 0) {
       return false;
     }
-    for (const fn of [...list]) {
+    for (const fn of list.slice()) {
       fn.apply(this, args);
     }
     return true;

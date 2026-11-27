@@ -66,49 +66,21 @@ test("PhaseC - vector search is scoped per world via the metadata filter", async
     });
 
     // A second world's entry in the same shared index must not leak through.
-    await vectorSearch.upsert([{
-      id: await buildSearchResultId({
-        subject: "urn:other-world",
-        predicate: "urn:knows",
-        graph: "",
-        text: "alpha beta topic",
-      }),
-      vector: new Float32Array([
-        1,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-      ]),
-      metadata: { world_id: "w-two", subject: "urn:other-world" },
-    }]);
+    await vectorSearch.upsert([
+      {
+        id: await buildSearchResultId({
+          subject: "urn:other-world",
+          predicate: "urn:knows",
+          graph: "",
+          text: "alpha beta topic",
+        }),
+        vector: new Float32Array([
+          1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ]),
+        metadata: { world_id: "w-two", subject: "urn:other-world" },
+      },
+    ]);
 
     const response = await searchIndex.search({ query: "alpha" });
     assert.deepStrictEqual(response.mode, "hybrid");
@@ -117,7 +89,10 @@ test("PhaseC - vector search is scoped per world via the metadata filter", async
       results.some((r) => r.subject === "urn:other-world"),
       false,
     );
-    assert.deepStrictEqual(results.some((r) => r.subject === "urn:a"), true);
+    assert.deepStrictEqual(
+      results.some((r) => r.subject === "urn:a"),
+      true,
+    );
   } finally {
     await substrate.dispose();
   }

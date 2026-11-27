@@ -64,12 +64,5 @@ export async function createHybridContext(): Promise<HybridTestContext> {
   };
 }
 
-export const quadText = (
-  subject: string,
-  text: string,
-) =>
-  createQuad(
-    namedNode(subject),
-    namedNode("urn:knows"),
-    literal(text),
-  );
+export const quadText = (subject: string, text: string) =>
+  createQuad(namedNode(subject), namedNode("urn:knows"), literal(text));

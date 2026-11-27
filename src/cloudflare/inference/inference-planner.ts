@@ -79,14 +79,16 @@ export function planInference(input: InferencePlanInput): InferencePlan {
   for (const quad of deletions) asserted.delete(quadKey(quad));
 
   // A quad already asserted would be counted twice by the reasoner.
-  const fresh = dedupe(input.insertions).filter((quad) =>
-    !asserted.has(quadKey(quad))
+  const fresh = dedupe(input.insertions).filter(
+    (quad) => !asserted.has(quadKey(quad)),
   );
   const derivedToAdd = reasoner.extend(fresh, "application");
 
-  const entailedDeletions = deletions.filter((quad) =>
-    !asserted.has(quadKey(quad)) && quad.predicate.termType === "NamedNode" &&
-    reasoner.has(quad.subject, quad.predicate, quad.object, quad.graph)
+  const entailedDeletions = deletions.filter(
+    (quad) =>
+      !asserted.has(quadKey(quad)) &&
+      quad.predicate.termType === "NamedNode" &&
+      reasoner.has(quad.subject, quad.predicate, quad.object, quad.graph),
   );
 
   return {

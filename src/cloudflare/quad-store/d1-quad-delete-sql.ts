@@ -31,9 +31,10 @@ export function buildDeleteDerivedQuadsByQuadIds(
 }
 
 /** buildDeleteAllDerivedQuads removes every inferred row, never an asserted one. */
-export function buildDeleteAllDerivedQuads(
-  worldId?: string,
-): { sql: string; args: string[] } {
+export function buildDeleteAllDerivedQuads(worldId?: string): {
+  sql: string;
+  args: string[];
+} {
   return {
     sql: `DELETE FROM quads WHERE derived = 1${
       worldId ? " AND world_id = ?" : ""

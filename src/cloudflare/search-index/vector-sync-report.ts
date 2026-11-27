@@ -63,8 +63,11 @@ export function mergeVectorSyncReports(
 
 /** vectorSyncSucceeded is true when nothing was dropped or left stale. */
 export function vectorSyncSucceeded(report: VectorSyncReport): boolean {
-  return report.failedUpserts === 0 && report.embeddingFailures === 0 &&
-    report.staleDeleteFailures === 0;
+  return (
+    report.failedUpserts === 0 &&
+    report.embeddingFailures === 0 &&
+    report.staleDeleteFailures === 0
+  );
 }
 
 /** recordVectorSyncError appends a failure message, keeping the list short. */

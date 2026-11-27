@@ -10,7 +10,7 @@ test("buildIndexes - returns 7 covering index DDL statements", () => {
   assert.deepStrictEqual(indexes.length, 7);
 
   const subjectFirstQuadPatternIndex = indexes.find((statement: string) =>
-    statement.includes("idx_quads_spog")
+    statement.includes("idx_quads_spog"),
   );
   assert.deepStrictEqual(
     subjectFirstQuadPatternIndex,
@@ -18,7 +18,7 @@ test("buildIndexes - returns 7 covering index DDL statements", () => {
   );
 
   const sopgIndex = indexes.find((statement: string) =>
-    statement.includes("idx_quads_sopg")
+    statement.includes("idx_quads_sopg"),
   );
   assert.deepStrictEqual(
     sopgIndex,
@@ -26,7 +26,7 @@ test("buildIndexes - returns 7 covering index DDL statements", () => {
   );
 
   const psoIndex = indexes.find((statement: string) =>
-    statement.includes("idx_quads_pso")
+    statement.includes("idx_quads_pso"),
   );
   assert.deepStrictEqual(
     psoIndex,
@@ -34,7 +34,7 @@ test("buildIndexes - returns 7 covering index DDL statements", () => {
   );
 
   const posIndex = indexes.find((statement: string) =>
-    statement.includes("idx_quads_pos")
+    statement.includes("idx_quads_pos"),
   );
   assert.deepStrictEqual(
     posIndex,
@@ -42,7 +42,7 @@ test("buildIndexes - returns 7 covering index DDL statements", () => {
   );
 
   const ospgIndex = indexes.find((statement: string) =>
-    statement.includes("idx_quads_ospg")
+    statement.includes("idx_quads_ospg"),
   );
   assert.deepStrictEqual(
     ospgIndex,
@@ -50,7 +50,7 @@ test("buildIndexes - returns 7 covering index DDL statements", () => {
   );
 
   const opsgIndex = indexes.find((statement: string) =>
-    statement.includes("idx_quads_opsg")
+    statement.includes("idx_quads_opsg"),
   );
   assert.deepStrictEqual(
     opsgIndex,
@@ -58,7 +58,7 @@ test("buildIndexes - returns 7 covering index DDL statements", () => {
   );
 
   const gpsoIndex = indexes.find((statement: string) =>
-    statement.includes("idx_quads_gpso")
+    statement.includes("idx_quads_gpso"),
   );
   assert.deepStrictEqual(
     gpsoIndex,
@@ -81,20 +81,18 @@ test("buildTables - returns quads and chunks DDL in dependency order", () => {
 
 test("quads table - 10-column libsql reference shape", () => {
   const ddl = testSchemaBuilder.buildD1QuadsTable();
-  for (
-    const column of [
-      "quad_id TEXT PRIMARY KEY",
-      "s TEXT NOT NULL",
-      "s_type TEXT NOT NULL",
-      "p TEXT NOT NULL",
-      "o TEXT NOT NULL",
-      "o_type TEXT NOT NULL",
-      "o_datatype TEXT",
-      "o_lang TEXT",
-      "g TEXT NOT NULL",
-      "g_type TEXT NOT NULL",
-    ]
-  ) {
+  for (const column of [
+    "quad_id TEXT PRIMARY KEY",
+    "s TEXT NOT NULL",
+    "s_type TEXT NOT NULL",
+    "p TEXT NOT NULL",
+    "o TEXT NOT NULL",
+    "o_type TEXT NOT NULL",
+    "o_datatype TEXT",
+    "o_lang TEXT",
+    "g TEXT NOT NULL",
+    "g_type TEXT NOT NULL",
+  ]) {
     assert.deepStrictEqual(
       ddl.includes(column),
       true,

@@ -54,9 +54,8 @@ test("D1BatchExecutor - flush chunks staged statements at the configured writeBa
   const connection = new D1ConnectionDriver(database);
   const executor = new D1BatchExecutor({ connection, writeBatchSize: 100 });
 
-  const statements = Array.from(
-    { length: 250 },
-    (_, index) => createStatement("INSERT INTO t VALUES (?)", [index]),
+  const statements = Array.from({ length: 250 }, (_, index) =>
+    createStatement("INSERT INTO t VALUES (?)", [index]),
   );
   await executor.stage(statements);
   await executor.flush();
@@ -94,15 +93,12 @@ test("D1BatchExecutor - repeated stage and flush accumulates batches independent
   const executor = new D1BatchExecutor({ connection, writeBatchSize: 100 });
 
   await executor.stage(
-    Array.from(
-      { length: 150 },
-      (_, index) => createStatement("INSERT INTO t VALUES (?)", [index]),
+    Array.from({ length: 150 }, (_, index) =>
+      createStatement("INSERT INTO t VALUES (?)", [index]),
     ),
   );
   await executor.flush();
-  await executor.stage([
-    createStatement("INSERT INTO t VALUES (?)", [999]),
-  ]);
+  await executor.stage([createStatement("INSERT INTO t VALUES (?)", [999])]);
   await executor.flush();
 
   assert.deepStrictEqual(database.batchCalls, [100, 50, 1]);
@@ -125,9 +121,8 @@ test("D1BatchExecutor - mid-stream batch failure reports progress and fails clos
   const executor = new D1BatchExecutor({ connection, writeBatchSize: 100 });
 
   await executor.stage(
-    Array.from(
-      { length: 250 },
-      (_, index) => createStatement("INSERT INTO t VALUES (?)", [index]),
+    Array.from({ length: 250 }, (_, index) =>
+      createStatement("INSERT INTO t VALUES (?)", [index]),
     ),
   );
   let flushError: Error | undefined;
@@ -159,9 +154,7 @@ test("D1BatchExecutor - mid-stream batch failure reports progress and fails clos
 
   const stageResult = await (async () => {
     try {
-      await executor.stage([
-        createStatement("INSERT INTO t VALUES (?)", [1]),
-      ]);
+      await executor.stage([createStatement("INSERT INTO t VALUES (?)", [1])]);
       return "staged";
     } catch (error) {
       return (error as Error).message.includes("fail-closed")

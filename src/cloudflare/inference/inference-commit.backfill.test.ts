@@ -19,18 +19,18 @@ test("backfillInference materializes inference for data written with it off", as
       });
     const sdkA = await open("world-a");
     const sdkB = await open("world-b");
-    const data =
-      `INSERT DATA { ex:Dog rdfs:subClassOf ex:Animal . ex:rex a ex:Dog . }`;
+    const data = `INSERT DATA { ex:Dog rdfs:subClassOf ex:Animal . ex:rex a ex:Dog . }`;
     await sdkA.sparql({ query: `${PREFIX}${data}` });
     await sdkB.sparql({ query: `${PREFIX}${data}` });
 
     const derivedIn = async (worldId: string) =>
       Number(
-        (await substrate.connection.execute<{ n: number }>({
-          sql:
-            "SELECT COUNT(*) AS n FROM quads WHERE derived = 1 AND world_id = ?",
-          args: [worldId],
-        })).rows[0]!.n,
+        (
+          await substrate.connection.execute<{ n: number }>({
+            sql: "SELECT COUNT(*) AS n FROM quads WHERE derived = 1 AND world_id = ?",
+            args: [worldId],
+          })
+        ).rows[0]!.n,
       );
     assert.deepStrictEqual(await derivedIn("world-a"), 0);
 
@@ -76,8 +76,7 @@ test("backfillInference honors the size guard before writing", async () => {
       searchIndexOnImport: "disabled",
     });
     await sdk.sparql({
-      query:
-        `${PREFIX}INSERT DATA { ex:a rdfs:subClassOf ex:b . ex:b rdfs:subClassOf ex:c . }`,
+      query: `${PREFIX}INSERT DATA { ex:a rdfs:subClassOf ex:b . ex:b rdfs:subClassOf ex:c . }`,
     });
     await rejected(
       () =>
@@ -100,10 +99,9 @@ test("backfillInference honors the size guard before writing", async () => {
 test("backfillInference fails closed without quads.derived", async () => {
   const substrate = await createTestD1();
   try {
-    const legacy = new D1SchemaBuilder(32).buildD1QuadsTable().replace(
-      ", derived INTEGER NOT NULL DEFAULT 0",
-      "",
-    );
+    const legacy = new D1SchemaBuilder(32)
+      .buildD1QuadsTable()
+      .replace(", derived INTEGER NOT NULL DEFAULT 0", "");
     await substrate.connection.execute({ sql: legacy });
     await rejected(
       () => backfillInference({ database: substrate.database }),

@@ -29,9 +29,8 @@ export function buildD1KeywordSearchStatement(
     filterArgs.push(worldId);
   }
 
-  const whereFilter = whereClauses.length > 0
-    ? `WHERE ${whereClauses.join(" AND ")}`
-    : "";
+  const whereFilter =
+    whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
   const hasQuery = !!request.query && request.query.trim().length > 0;
   const sanitizedQuery = hasQuery ? sanitizeFtsQuery(request.query) : "";
@@ -64,8 +63,7 @@ export function buildD1KeywordSearchStatement(
   }
 
   return {
-    sql:
-      "SELECT NULL as subject, NULL as predicate, NULL as graph, NULL as value, 0 as combined_rank WHERE 0 = 1",
+    sql: "SELECT NULL as subject, NULL as predicate, NULL as graph, NULL as value, 0 as combined_rank WHERE 0 = 1",
     args: [],
   };
 }

@@ -5,9 +5,10 @@ import {
   type InsertQuadRow,
 } from "./d1-quad-sql-types.ts";
 
-export function buildInsertQuad(
-  insertQuadOptions: InsertQuadRow,
-): { sql: string; args: (string | null | number)[] } {
+export function buildInsertQuad(insertQuadOptions: InsertQuadRow): {
+  sql: string;
+  args: (string | null | number)[];
+} {
   return buildBulkInsertQuads([insertQuadOptions])[0];
 }
 
@@ -24,9 +25,8 @@ export function buildBulkInsertQuads(
     return [];
   }
 
-  const statements: Array<
-    { sql: string; args: (string | null | number)[] }
-  > = [];
+  const statements: Array<{ sql: string; args: (string | null | number)[] }> =
+    [];
 
   for (
     let rowOffset = 0;
@@ -39,8 +39,8 @@ export function buildBulkInsertQuads(
     );
     const hasWorld = rowBatch[0]?.world_id !== undefined;
     const hasDerived = rowBatch[0]?.derived !== undefined;
-    const columnCount = D1_INSERT_QUAD_COLUMN_COUNT + (hasWorld ? 1 : 0) +
-      (hasDerived ? 1 : 0);
+    const columnCount =
+      D1_INSERT_QUAD_COLUMN_COUNT + (hasWorld ? 1 : 0) + (hasDerived ? 1 : 0);
     const valuePlaceholders = rowBatch
       .map(() => `(${generatePlaceholders(columnCount)})`)
       .join(", ");

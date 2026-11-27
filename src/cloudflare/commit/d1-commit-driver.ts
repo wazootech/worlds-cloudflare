@@ -65,8 +65,8 @@ export function createD1CommitDriver(
   options: D1CommitDriverOptions,
 ): D1CommitDriver {
   const { connection, worldId } = options;
-  const batchSize = options.maxWriteBatchSize ??
-    DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
+  const batchSize =
+    options.maxWriteBatchSize ?? DEFAULT_D1_MAX_WRITE_BATCH_SIZE;
   const lookupChunkSize = effectiveLookupChunkSize(
     options.maxLookupChunkSize,
     Boolean(worldId),
@@ -99,14 +99,14 @@ export function createD1CommitDriver(
         // Inferred rows are not indexed: they are rebuildable from asserted ones.
         options.inferenceEnabled
           ? buildSelectAssertedQuadsPage(
-            { afterQuadId, limit: pageSize },
-            worldId,
-          )
+              { afterQuadId, limit: pageSize },
+              worldId,
+            )
           : buildMatchQuadsQuery(
-            { subject: null, predicate: null, object: null, graph: null },
-            { afterQuadId, limit: pageSize },
-            worldId,
-          ),
+              { subject: null, predicate: null, object: null, graph: null },
+              { afterQuadId, limit: pageSize },
+              worldId,
+            ),
       );
       const quads: rdfjs.Quad[] = [];
       for (const row of rows) {
