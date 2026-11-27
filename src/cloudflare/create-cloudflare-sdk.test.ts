@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { createCloudflareWorldsSdk } from "./create-cloudflare-sdk.ts";
 import { createTestD1 } from "@/cloudflare/d1-test-substrate.ts";
 import type { WorldsSdkInterface } from "@worlds/sdk";
@@ -13,7 +14,7 @@ async function createTestWorldsSdk(): Promise<
   return { sdk, dispose: substrate.dispose };
 }
 
-Deno.test("createCloudflareWorldsSdk - import/export round-trips quads", async () => {
+test("createCloudflareWorldsSdk - import/export round-trips quads", async () => {
   const { sdk, dispose } = await createTestWorldsSdk();
   try {
     await sdk.import({
@@ -32,13 +33,13 @@ Deno.test("createCloudflareWorldsSdk - import/export round-trips quads", async (
       throw new Error("export did not return serialized data");
     }
 
-    assertEquals(exported.data.includes("urn:ethan"), true);
+    assert.deepStrictEqual(exported.data.includes("urn:ethan"), true);
   } finally {
     await dispose();
   }
 });
 
-Deno.test("createCloudflareWorldsSdk - SPARQL query resolves stored facts", async () => {
+test("createCloudflareWorldsSdk - SPARQL query resolves stored facts", async () => {
   const { sdk, dispose } = await createTestWorldsSdk();
   try {
     await sdk.import({
@@ -58,14 +59,14 @@ Deno.test("createCloudflareWorldsSdk - SPARQL query resolves stored facts", asyn
     }
 
     const bindings = response.data.results.bindings;
-    assertEquals(bindings.length, 1);
-    assertEquals(bindings[0].s.value, "urn:ethan");
+    assert.deepStrictEqual(bindings.length, 1);
+    assert.deepStrictEqual(bindings[0].s.value, "urn:ethan");
   } finally {
     await dispose();
   }
 });
 
-Deno.test("createCloudflareWorldsSdk - keyword search over imported literals", async () => {
+test("createCloudflareWorldsSdk - keyword search over imported literals", async () => {
   const { sdk, dispose } = await createTestWorldsSdk();
   try {
     await sdk.import({
@@ -78,14 +79,14 @@ Deno.test("createCloudflareWorldsSdk - keyword search over imported literals", a
     });
 
     const response = await sdk.search({ query: "Ethan" });
-    assertEquals(response.results?.length, 1);
-    assertEquals(response.results?.[0].subject, "urn:ethan");
+    assert.deepStrictEqual(response.results?.length, 1);
+    assert.deepStrictEqual(response.results?.[0].subject, "urn:ethan");
   } finally {
     await dispose();
   }
 });
 
-Deno.test("createCloudflareWorldsSdk - SPARQL insert triggers search projection", async () => {
+test("createCloudflareWorldsSdk - SPARQL insert triggers search projection", async () => {
   const { sdk, dispose } = await createTestWorldsSdk();
   try {
     await sdk.sparql({
@@ -94,13 +95,13 @@ Deno.test("createCloudflareWorldsSdk - SPARQL insert triggers search projection"
     });
 
     const response = await sdk.search({ query: "Gregory" });
-    assertEquals(response.results?.length, 1);
+    assert.deepStrictEqual(response.results?.length, 1);
   } finally {
     await dispose();
   }
 });
 
-Deno.test("createCloudflareWorldsSdk - invalid vectorDimensions throws", async () => {
+test("createCloudflareWorldsSdk - invalid vectorDimensions throws", async () => {
   const substrate = await createTestD1();
   try {
     await createCloudflareWorldsSdk({
@@ -112,7 +113,7 @@ Deno.test("createCloudflareWorldsSdk - invalid vectorDimensions throws", async (
     );
   } catch (error) {
     const message = (error as Error).message;
-    assertEquals(
+    assert.deepStrictEqual(
       message.includes("vectorDimensions must be a finite integer"),
       true,
     );

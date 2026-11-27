@@ -5,10 +5,13 @@
  * problem, so it can gate a deploy or a human's post-provision checklist.
  *
  *   deno task vectorize:verify <index-name> [--dimensions 1536]
+ *   bun scripts/verify-vectorize.ts <index-name> [--dimensions 1536]
  *
  * Requires wrangler credentials for the account that owns the index
  * (CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID or `wrangler login`).
  */
+import { spawnSync } from "node:child_process";
+import process from "node:process";
 import {
   checkVectorizeIndex,
   DEFAULT_VECTORIZE_DIMENSIONS,
@@ -16,18 +19,18 @@ import {
   type VectorizeMetadataIndexObservation,
 } from "../src/cloudflare/search-index/vector-search/vectorize-provisioning.ts";
 
-async function wrangler(
+function wrangler(
   args: string[],
-): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-  const command = Deno.build.os === "windows"
-    ? new Deno.Command("cmd", { args: ["/c", "npx", "wrangler", ...args] })
-    : new Deno.Command("npx", { args: ["wrangler", ...args] });
-  const out = await command.output();
-  const decoder = new TextDecoder();
+): { ok: boolean; stdout: string; stderr: string } {
+  // npx is a .cmd shim on Windows, which only a shell can launch.
+  const out = spawnSync("npx", ["wrangler", ...args], {
+    encoding: "utf8",
+    shell: process.platform === "win32",
+  });
   return {
-    ok: out.success,
-    stdout: decoder.decode(out.stdout),
-    stderr: decoder.decode(out.stderr),
+    ok: out.status === 0,
+    stdout: out.stdout ?? "",
+    stderr: out.stderr ?? "",
   };
 }
 
@@ -41,7 +44,7 @@ function parseJson<T>(text: string): T | undefined {
   }
 }
 
-const args = [...Deno.args];
+const args = process.argv.slice(2);
 const dimIndex = args.indexOf("--dimensions");
 let dimensions = DEFAULT_VECTORIZE_DIMENSIONS;
 if (dimIndex >= 0) {
@@ -53,15 +56,15 @@ if (!name) {
   console.error(
     "usage: deno task vectorize:verify <index-name> [--dimensions N]",
   );
-  Deno.exit(2);
+  process.exit(2);
 }
 
-const got = await wrangler(["vectorize", "get", name, "--json"]);
+const got = wrangler(["vectorize", "get", name, "--json"]);
 let index: VectorizeIndexObservation | undefined;
 let metadataIndexes: VectorizeMetadataIndexObservation[] = [];
 if (got.ok) {
   index = parseJson<VectorizeIndexObservation>(got.stdout);
-  const listed = await wrangler([
+  const listed = wrangler([
     "vectorize",
     "list-metadata-index",
     name,
@@ -69,14 +72,14 @@ if (got.ok) {
   ]);
   if (!listed.ok) {
     console.error(listed.stderr || listed.stdout);
-    Deno.exit(1);
+    process.exit(1);
   }
   metadataIndexes =
     parseJson<VectorizeMetadataIndexObservation[]>(listed.stdout) ?? [];
 } else if (!/not_found|3000|does not exist/i.test(got.stdout + got.stderr)) {
   // Auth or network failure: not evidence the index is missing.
   console.error(got.stderr || got.stdout);
-  Deno.exit(1);
+  process.exit(1);
 }
 
 const problems = checkVectorizeIndex(
@@ -86,7 +89,7 @@ const problems = checkVectorizeIndex(
 );
 if (problems.length > 0) {
   for (const problem of problems) console.error(`FAIL ${problem}`);
-  Deno.exit(1);
+  process.exit(1);
 }
 console.log(
   `OK   ${name}: ${dimensions} dimensions, cosine, world_id filterable`,

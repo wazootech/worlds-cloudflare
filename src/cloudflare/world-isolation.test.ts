@@ -1,4 +1,6 @@
-import { assert, assertEquals } from "@std/assert";
+import { readFile } from "node:fs/promises";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { DataFactory } from "@wazoo/sparql-engine";
 import { createCloudflareWorldsSdk } from "./create-cloudflare-sdk.ts";
 import { createTestD1 } from "./d1-test-substrate.ts";
@@ -10,7 +12,7 @@ const worldB = "world-b";
 
 const source = (value: string) => `<urn:alice> <urn:name> "${value}" .\n`;
 
-Deno.test("worldId isolates select, delete, update, import, reindex, and search", async () => {
+test("worldId isolates select, delete, update, import, reindex, and search", async () => {
   const substrate = await createTestD1();
   try {
     const sdkA = await createCloudflareWorldsSdk({
@@ -35,41 +37,62 @@ Deno.test("worldId isolates select, delete, update, import, reindex, and search"
       const response = await sdk.sparql({
         query: "SELECT ?name WHERE { <urn:alice> <urn:name> ?name }",
       });
-      assertEquals(response.kind, "select");
+      assert.deepStrictEqual(response.kind, "select");
       return response.kind === "select"
         ? response.data.results.bindings.map((binding) => binding.name.value)
         : [];
     };
-    assertEquals(await select(sdkA), ["A"]);
-    assertEquals(await select(sdkB), ["B"]);
+    assert.deepStrictEqual(await select(sdkA), ["A"]);
+    assert.deepStrictEqual(await select(sdkB), ["B"]);
 
-    assertEquals((await sdkA.search({ query: "A" })).results?.length, 1);
-    assertEquals((await sdkA.search({ query: "B" })).results?.length, 0);
-    assertEquals((await sdkB.search({ query: "B" })).results?.length, 1);
-    assertEquals((await sdkB.search({ query: "A" })).results?.length, 0);
+    assert.deepStrictEqual(
+      (await sdkA.search({ query: "A" })).results?.length,
+      1,
+    );
+    assert.deepStrictEqual(
+      (await sdkA.search({ query: "B" })).results?.length,
+      0,
+    );
+    assert.deepStrictEqual(
+      (await sdkB.search({ query: "B" })).results?.length,
+      1,
+    );
+    assert.deepStrictEqual(
+      (await sdkB.search({ query: "A" })).results?.length,
+      0,
+    );
 
     await sdkA.sparql({
       query: 'DELETE WHERE { <urn:alice> <urn:name> "A" }',
     });
-    assertEquals(await select(sdkA), []);
-    assertEquals(await select(sdkB), ["B"]);
+    assert.deepStrictEqual(await select(sdkA), []);
+    assert.deepStrictEqual(await select(sdkB), ["B"]);
 
     await sdkA.sparql({
       query: 'INSERT DATA { <urn:alice> <urn:name> "A2" }',
     });
-    assertEquals(await select(sdkA), ["A2"]);
-    assertEquals(await select(sdkB), ["B"]);
+    assert.deepStrictEqual(await select(sdkA), ["A2"]);
+    assert.deepStrictEqual(await select(sdkB), ["B"]);
 
     await sdkA.reindex({});
-    assertEquals((await sdkA.search({ query: "A2" })).results?.length, 1);
-    assertEquals((await sdkA.search({ query: "B" })).results?.length, 0);
-    assertEquals((await sdkB.search({ query: "B" })).results?.length, 1);
+    assert.deepStrictEqual(
+      (await sdkA.search({ query: "A2" })).results?.length,
+      1,
+    );
+    assert.deepStrictEqual(
+      (await sdkA.search({ query: "B" })).results?.length,
+      0,
+    );
+    assert.deepStrictEqual(
+      (await sdkB.search({ query: "B" })).results?.length,
+      1,
+    );
   } finally {
     await substrate.dispose();
   }
 });
 
-Deno.test("worldId serializes concurrent writes without cross-world leakage", async () => {
+test("worldId serializes concurrent writes without cross-world leakage", async () => {
   const substrate = await createTestD1();
   try {
     const sdkA = await createCloudflareWorldsSdk({
@@ -104,19 +127,22 @@ Deno.test("worldId serializes concurrent writes without cross-world leakage", as
       const response = await sdk.sparql({
         query: "SELECT ?s WHERE { ?s <urn:name> ?name }",
       });
-      assert(response.kind === "select");
+      assert.ok(response.kind === "select");
       return response.data.results.bindings.length;
     };
-    assertEquals(await count(sdkA), 1);
-    assertEquals(await count(sdkB), 1);
+    assert.deepStrictEqual(await count(sdkA), 1);
+    assert.deepStrictEqual(await count(sdkB), 1);
 
     const raw = await substrate.database.prepare(
       "SELECT world_id, COUNT(*) AS count FROM quads GROUP BY world_id ORDER BY world_id",
     ).all<{ world_id: string; count: number }>();
-    assertEquals(raw.results.map((row) => [row.world_id, Number(row.count)]), [
-      [worldA, 1],
-      [worldB, 1],
-    ]);
+    assert.deepStrictEqual(
+      raw.results.map((row) => [row.world_id, Number(row.count)]),
+      [
+        [worldA, 1],
+        [worldB, 1],
+      ],
+    );
   } finally {
     await substrate.dispose();
   }
@@ -124,7 +150,7 @@ Deno.test("worldId serializes concurrent writes without cross-world leakage", as
 
 void DataFactory;
 
-Deno.test("worlds holding the identical triples keep their own rows (#60)", async () => {
+test("worlds holding the identical triples keep their own rows (#60)", async () => {
   const substrate = await createTestD1();
   try {
     const open = (worldId: string) =>
@@ -152,21 +178,21 @@ Deno.test("worlds holding the identical triples keep their own rows (#60)", asyn
     await sdkA.sparql({ query: insert });
     await sdkB.sparql({ query: insert });
     // Two asserted triples plus the one subClassOf inference, in each world.
-    assertEquals(await count(sdkA), 3);
-    assertEquals(await count(sdkB), 3);
+    assert.deepStrictEqual(await count(sdkA), 3);
+    assert.deepStrictEqual(await count(sdkB), 3);
 
     await sdkA.sparql({
       query:
         "DELETE DATA { <urn:y> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <urn:z> }",
     });
-    assertEquals(await count(sdkA), 1);
-    assertEquals(await count(sdkB), 3);
+    assert.deepStrictEqual(await count(sdkA), 1);
+    assert.deepStrictEqual(await count(sdkB), 3);
   } finally {
     await substrate.dispose();
   }
 });
 
-Deno.test("0002 rebuilds a legacy quads table with a world-scoped key and keeps its rows", async () => {
+test("0002 rebuilds a legacy quads table with a world-scoped key and keeps its rows", async () => {
   const substrate = await createTestD1();
   try {
     const modern = new D1SchemaBuilder(32, { worldId: worldA });
@@ -191,11 +217,12 @@ Deno.test("0002 rebuilds a legacy quads table with a world-scoped key and keeps 
       worldId: worldA,
     });
 
-    const migration = await Deno.readTextFile(
+    const migration = await readFile(
       new URL(
         "../../migrations/0002-quads-world-scoped-key.sql",
         import.meta.url,
       ),
+      "utf8",
     );
     const statements = migration.split("\n").filter((line) =>
       !line.startsWith("--")
@@ -207,14 +234,14 @@ Deno.test("0002 rebuilds a legacy quads table with a world-scoped key and keeps 
     const columns = await substrate.connection.execute<
       { name: string; pk: number }
     >({ sql: "PRAGMA table_info(quads)" });
-    assertEquals(
+    assert.deepStrictEqual(
       columns.rows.filter((c) => Number(c.pk) > 0).map((c) => c.name).sort(),
       ["quad_id", "world_id"],
     );
     const rows = await substrate.connection.execute<{ n: number }>({
       sql: "SELECT COUNT(*) AS n FROM quads WHERE world_id = 'world-a'",
     });
-    assertEquals(Number(rows.rows[0]!.n), 1);
+    assert.deepStrictEqual(Number(rows.rows[0]!.n), 1);
 
     // The same quad id may now exist in another world.
     await substrate.connection.execute({

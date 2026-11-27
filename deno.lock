@@ -13,11 +13,16 @@
     "jsr:@worlds/sdk@0.11": "0.11.0",
     "jsr:@worlds/sdk@0.11.0": "0.11.0",
     "jsr:@worlds/sqlite@~0.8.2": "0.8.2",
-    "npm:@langchain/textsplitters@^1.0.1": "1.0.2_@langchain+core@1.4.2",
+    "npm:@jsr/wazoo__reasoner@~0.4.1": "0.4.2",
+    "npm:@jsr/wazoo__sparql-engine@0.5": "0.5.1",
+    "npm:@jsr/worlds__sdk@0.11": "0.11.0_@tensorflow+tfjs-core@4.22.0_seedrandom@3.0.5_zod@4.6.7",
+    "npm:@jsr/worlds__sqlite@~0.8.2": "0.8.2_@langchain+core@1.5.1_@tensorflow+tfjs-core@4.22.0_seedrandom@3.0.5_zod@4.6.7",
+    "npm:@langchain/textsplitters@^1.0.1": "1.0.2_@langchain+core@1.5.1",
     "npm:@rdfjs/types@^2.0.1": "2.0.1",
     "npm:@tensorflow/tfjs-backend-wasm@^4.22.0": "4.22.0_@tensorflow+tfjs-core@4.22.0",
     "npm:@tensorflow/tfjs@^4.22.0": "4.22.0_seedrandom@3.0.5",
     "npm:@types/n3@1.26.1": "1.26.1",
+    "npm:@types/node@24.19.2": "24.19.2",
     "npm:ai@^6.0.195": "6.0.333_zod@4.6.7",
     "npm:miniflare@^4.20260730.0": "4.20260730.0",
     "npm:n3@^2.0.3": "2.13.12",
@@ -331,8 +336,69 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "@langchain/core@1.4.2": {
-      "integrity": "sha512-XjYUhRmgtKvopQtSQEYR9WQZMOUtN7yXsYapu7Zvo9leRN18CPPoa4Nj2+lYL0rC+zIG0HOFkY/2Cn813CBdNA==",
+    "@jsr/std__encoding@1.0.11": {
+      "integrity": "sha512-4SmW8WXf4x4FjkxVpxbir06QYwxw/h/2+RU5A66iKXbJC9WAYCICZkH01mcOGj8FgSitF/lSTlT585RZfo8Ukg==",
+      "tarball": "https://npm.jsr.io/~/11/@jsr/std__encoding/1.0.11.tgz"
+    },
+    "@jsr/std__internal@1.0.14": {
+      "integrity": "sha512-JT8b/t40WcR9q0GDwRZUooY7aXeXnFal8iidE/5TckdAFtvpVAsaJ71/Xgf1SfoChs41s6CZkuCYM8toaNgdvA==",
+      "tarball": "https://npm.jsr.io/~/11/@jsr/std__internal/1.0.14.tgz"
+    },
+    "@jsr/std__path@1.1.6": {
+      "integrity": "sha512-H1Cmg6z8jFyIsQbVV+vZB4eOx4k6Qg8lyUM6l7nZysj5MZumg89kb0M1bsPBTGQis3fw6mJFkJELo5+AK6oCFA==",
+      "dependencies": [
+        "@jsr/std__internal"
+      ],
+      "tarball": "https://npm.jsr.io/~/11/@jsr/std__path/1.1.6.tgz"
+    },
+    "@jsr/wazoo__reasoner@0.4.2": {
+      "integrity": "sha512-DcuUViw6I55r8GTLBm+4pNmkPiQGNwvGe0+gbJ9t0v3ZVo8xj2SfPT1u3iq8cqjvpmiDnAoRz+zMJVmBs8Hfdg==",
+      "dependencies": [
+        "@jsr/wazoo__sparql-engine",
+        "@rdfjs/types"
+      ],
+      "tarball": "https://npm.jsr.io/~/11/@jsr/wazoo__reasoner/0.4.2.tgz"
+    },
+    "@jsr/wazoo__sparql-engine@0.5.1": {
+      "integrity": "sha512-moFAPS6D61w6gVNLCf+eG5kPhlBrWKzQ6OQMgcWZAqm8GxDH6Z9XMucDhUnX1ugszhaeKkokeJUJmv4tzmKj6Q==",
+      "dependencies": [
+        "@rdfjs/types"
+      ],
+      "tarball": "https://npm.jsr.io/~/11/@jsr/wazoo__sparql-engine/0.5.1.tgz"
+    },
+    "@jsr/worlds__client@0.1.0": {
+      "integrity": "sha512-Z5iL51C6EXn4Iu1S+zTM+CGRdYRwFUZrEHOVOP2mQslCID0qNaWO7GuNNvGRZMpokjPXSBnL7pHmz72R8Yw3bA==",
+      "tarball": "https://npm.jsr.io/~/11/@jsr/worlds__client/0.1.0.tgz"
+    },
+    "@jsr/worlds__sdk@0.11.0_@tensorflow+tfjs-core@4.22.0_seedrandom@3.0.5_zod@4.6.7": {
+      "integrity": "sha512-QRtlzcZhfB6GiQ2s0+ohf6dm4pOrEzVaU39b5jjKCLU3svxOuBSB61kPvSJhCPBmoZE8nkuqn+ihjSXIRGhtxw==",
+      "dependencies": [
+        "@jsr/std__encoding",
+        "@jsr/std__path",
+        "@jsr/wazoo__sparql-engine",
+        "@jsr/worlds__client",
+        "@rdfjs/types",
+        "@tensorflow/tfjs",
+        "@tensorflow/tfjs-backend-wasm",
+        "@types/n3",
+        "ai",
+        "n3"
+      ],
+      "tarball": "https://npm.jsr.io/~/11/@jsr/worlds__sdk/0.11.0.tgz"
+    },
+    "@jsr/worlds__sqlite@0.8.2_@langchain+core@1.5.1_@tensorflow+tfjs-core@4.22.0_seedrandom@3.0.5_zod@4.6.7": {
+      "integrity": "sha512-u4hPixxKrmzU6Au+iUEBl1nqHHLohqaHPK+8yI0xyxnGvc3VCJcZGNhavsCeNtut+wdiz/fPFp/c+WAzTlGL2Q==",
+      "dependencies": [
+        "@jsr/wazoo__sparql-engine",
+        "@jsr/worlds__sdk",
+        "@langchain/textsplitters",
+        "@rdfjs/types",
+        "sqlite-vec"
+      ],
+      "tarball": "https://npm.jsr.io/~/11/@jsr/worlds__sqlite/0.8.2.tgz"
+    },
+    "@langchain/core@1.5.1": {
+      "integrity": "sha512-vPtTZGYxzpJBDJ4BHkPJZpC4+ceAFl+Fs1YCXy2VQiUsPRvNEJmXIE/sJLza5MroKRltPLMfJ/qIsSPHqUBr1w==",
       "dependencies": [
         "@cfworker/json-schema",
         "@standard-schema/spec",
@@ -343,7 +409,7 @@
         "zod"
       ]
     },
-    "@langchain/textsplitters@1.0.2_@langchain+core@1.4.2": {
+    "@langchain/textsplitters@1.0.2_@langchain+core@1.5.1": {
       "integrity": "sha512-UNCmlyFIRlRfVxqpmcRsp1jQrscnIVVqRKrrjFF2wHHq+VGTv+VDkGZLyEVUopJfHIdaiXfOKlSrROQui7VLFA==",
       "dependencies": [
         "@langchain/core",
@@ -482,8 +548,8 @@
         "form-data"
       ]
     },
-    "@types/node@26.6.6": {
-      "integrity": "sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==",
+    "@types/node@24.19.2": {
+      "integrity": "sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==",
       "dependencies": [
         "undici-types"
       ]
@@ -927,8 +993,8 @@
     "tslib@2.9.1": {
       "integrity": "sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA=="
     },
-    "undici-types@8.9.0": {
-      "integrity": "sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg=="
+    "undici-types@7.24.6": {
+      "integrity": "sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg=="
     },
     "undici@6.29.1": {
       "integrity": "sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA=="
@@ -1018,6 +1084,18 @@
       "npm:@langchain/textsplitters@^1.0.1",
       "npm:@rdfjs/types@^2.0.1",
       "npm:miniflare@^4.20260730.0"
-    ]
+    ],
+    "packageJson": {
+      "dependencies": [
+        "npm:@jsr/wazoo__reasoner@~0.4.1",
+        "npm:@jsr/wazoo__sparql-engine@0.5",
+        "npm:@jsr/worlds__sdk@0.11",
+        "npm:@jsr/worlds__sqlite@~0.8.2",
+        "npm:@langchain/textsplitters@^1.0.1",
+        "npm:@rdfjs/types@^2.0.1",
+        "npm:@types/node@24.19.2",
+        "npm:miniflare@^4.20260730.0"
+      ]
+    }
   }
 }
