@@ -1,4 +1,6 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { rejected } from "../../../test/thrown.ts";
 import { DataFactory } from "@wazoo/sparql-engine/data-model";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { FakeEmbeddingService } from "@worlds/sdk/search-index/embedding-service";
@@ -106,58 +108,74 @@ async function captureErrors(fn: () => Promise<void>): Promise<string> {
   return lines.join("\n");
 }
 
-Deno.test("#40 - a failed vector upsert keeps the import, logs drift, and reindex reports then repairs it", async () => {
+test("#40 - a failed vector upsert keeps the import, logs drift, and reindex reports then repairs it", async () => {
   const ctx = await createContext();
   try {
     ctx.vectorSearch.failUpsert = true;
     const logged = await captureErrors(() => ctx.importText("urn:a", "alpha"));
-    assertEquals(await ctx.chunkCount(), 1, "D1 write still committed");
-    assertEquals(ctx.vectorSearch.size, 0, "vector never reached the index");
-    assert(logged.includes("vector index drifted from D1"), logged);
-    assert(logged.includes('"failedUpserts":1'), logged);
+    assert.deepStrictEqual(
+      await ctx.chunkCount(),
+      1,
+      "D1 write still committed",
+    );
+    assert.deepStrictEqual(
+      ctx.vectorSearch.size,
+      0,
+      "vector never reached the index",
+    );
+    assert.ok(logged.includes("vector index drifted from D1"), logged);
+    assert.ok(logged.includes('"failedUpserts":1'), logged);
 
     let response;
     const reindexLog = await captureErrors(async () => {
       response = await ctx.searchIndex.reindex();
     });
-    assertEquals(response!.vectorSync.failedUpserts, 1);
-    assertEquals(response!.vectorSync.upserted, 0);
-    assert(response!.vectorSync.errors[0].includes("vectorize 503"));
-    assert(reindexLog.includes('"operation":"reindex"'), reindexLog);
+    assert.deepStrictEqual(response!.vectorSync.failedUpserts, 1);
+    assert.deepStrictEqual(response!.vectorSync.upserted, 0);
+    assert.ok(response!.vectorSync.errors[0].includes("vectorize 503"));
+    assert.ok(reindexLog.includes('"operation":"reindex"'), reindexLog);
 
     ctx.vectorSearch.failUpsert = false;
     const repaired = await ctx.searchIndex.reindex();
-    assertEquals(repaired.vectorSync.failedUpserts, 0);
-    assertEquals(repaired.vectorSync.upserted, 1);
-    assertEquals(ctx.vectorSearch.size, 1, "reindex repaired the drift");
+    assert.deepStrictEqual(repaired.vectorSync.failedUpserts, 0);
+    assert.deepStrictEqual(repaired.vectorSync.upserted, 1);
+    assert.deepStrictEqual(
+      ctx.vectorSearch.size,
+      1,
+      "reindex repaired the drift",
+    );
   } finally {
     await ctx.dispose();
   }
 });
 
-Deno.test("#40 - an embedding outage throws: an import and a reindex write nothing new, and a retry succeeds", async () => {
+test("#40 - an embedding outage throws: an import and a reindex write nothing new, and a retry succeeds", async () => {
   const ctx = await createContext();
   try {
     ctx.embeddingService.fail = true;
-    await assertRejects(
+    await rejected(
       () => ctx.importText("urn:b", "beta"),
       Error,
       "failed to vectorize literal chunk blocks",
     );
-    assertEquals(await ctx.chunkCount(), 0, "the failed import wrote nothing");
+    assert.deepStrictEqual(
+      await ctx.chunkCount(),
+      0,
+      "the failed import wrote nothing",
+    );
 
     ctx.embeddingService.fail = false;
     await ctx.importText("urn:b", "beta");
-    assertEquals(await ctx.chunkCount(), 1);
-    assertEquals(ctx.vectorSearch.size, 1);
+    assert.deepStrictEqual(await ctx.chunkCount(), 1);
+    assert.deepStrictEqual(ctx.vectorSearch.size, 1);
 
     ctx.embeddingService.fail = true;
-    await assertRejects(
+    await rejected(
       () => ctx.searchIndex.reindex(),
       Error,
       "failed to vectorize literal chunk blocks",
     );
-    assertEquals(
+    assert.deepStrictEqual(
       await ctx.chunkCount(),
       1,
       "the failed reindex kept the chunk",
@@ -165,14 +183,14 @@ Deno.test("#40 - an embedding outage throws: an import and a reindex write nothi
 
     ctx.embeddingService.fail = false;
     const repaired = await ctx.searchIndex.reindex();
-    assertEquals(repaired.vectorSync.embeddingFailures, 0);
-    assertEquals(ctx.vectorSearch.size, 1);
+    assert.deepStrictEqual(repaired.vectorSync.embeddingFailures, 0);
+    assert.deepStrictEqual(ctx.vectorSearch.size, 1);
   } finally {
     await ctx.dispose();
   }
 });
 
-Deno.test("#40 - a failed stale-vector delete is reported by reindex", async () => {
+test("#40 - a failed stale-vector delete is reported by reindex", async () => {
   const ctx = await createContext();
   try {
     await ctx.importText("urn:c", "gamma");
@@ -181,20 +199,20 @@ Deno.test("#40 - a failed stale-vector delete is reported by reindex", async () 
     await captureErrors(async () => {
       response = await ctx.searchIndex.reindex();
     });
-    assert(response!.vectorSync.staleDeleteFailures > 0);
-    assert(response!.vectorSync.errors[0].startsWith("delete-stale:"));
+    assert.ok(response!.vectorSync.staleDeleteFailures > 0);
+    assert.ok(response!.vectorSync.errors[0].startsWith("delete-stale:"));
   } finally {
     await ctx.dispose();
   }
 });
 
-Deno.test("#40 - a healthy reindex reports a clean, complete vector sync", async () => {
+test("#40 - a healthy reindex reports a clean, complete vector sync", async () => {
   const ctx = await createContext();
   try {
     await ctx.importText("urn:d", "delta");
     const logged = await captureErrors(async () => {
       const response = await ctx.searchIndex.reindex();
-      assertEquals(response.vectorSync, {
+      assert.deepStrictEqual(response.vectorSync, {
         enabled: true,
         attempted: 1,
         upserted: 1,
@@ -204,20 +222,20 @@ Deno.test("#40 - a healthy reindex reports a clean, complete vector sync", async
         errors: [],
       });
     });
-    assertEquals(logged, "", "no drift logged when nothing failed");
+    assert.deepStrictEqual(logged, "", "no drift logged when nothing failed");
   } finally {
     await ctx.dispose();
   }
 });
 
-Deno.test("#40 - without a vector index, vector sync is reported as disabled", async () => {
+test("#40 - without a vector index, vector sync is reported as disabled", async () => {
   const ctx = await createContext(false);
   try {
     await ctx.importText("urn:e", "epsilon");
     const response = await ctx.searchIndex.reindex();
-    assertEquals(response.vectorSync.enabled, false);
-    assertEquals(response.vectorSync.attempted, 0);
-    assertEquals(response.chunkRowCount, 1);
+    assert.deepStrictEqual(response.vectorSync.enabled, false);
+    assert.deepStrictEqual(response.vectorSync.attempted, 0);
+    assert.deepStrictEqual(response.chunkRowCount, 1);
   } finally {
     await ctx.dispose();
   }

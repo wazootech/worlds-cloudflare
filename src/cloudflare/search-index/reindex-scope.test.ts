@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import assert from "node:assert/strict";
+import test from "node:test";
 import type { ReindexRequest } from "@worlds/sdk/search-index";
 import {
   createHybridContext,
@@ -29,7 +30,7 @@ async function fixture() {
       ],
     },
   });
-  assertEquals(ctx.vectorSearch.size, 4);
+  assert.deepStrictEqual(ctx.vectorSearch.size, 4);
   return ctx;
 }
 
@@ -61,20 +62,28 @@ async function scopedCase(
     await tamper(ctx, ...inScope);
     await tamper(ctx, ...outScope);
     const report = await ctx.searchIndex.reindex(request);
-    assertEquals(report.processedQuadCount, 4, "every scanned quad counts");
-    assertEquals(report.chunkRowCount, 2);
-    assertEquals(
+    assert.deepStrictEqual(
+      report.processedQuadCount,
+      4,
+      "every scanned quad counts",
+    );
+    assert.deepStrictEqual(report.chunkRowCount, 2);
+    assert.deepStrictEqual(
       await count(ctx, `${outScope[0]} = ? AND value = 'stale'`, outScope[1]),
       2,
       "out-of-scope chunk rows survive untouched",
     );
-    assertEquals(
+    assert.deepStrictEqual(
       await count(ctx, `${inScope[0]} = ? AND value = 'stale'`, inScope[1]),
       0,
       "in-scope chunk rows are refreshed",
     );
-    assertEquals(await count(ctx), 4, "no chunk row lost or duplicated");
-    assertEquals(
+    assert.deepStrictEqual(
+      await count(ctx),
+      4,
+      "no chunk row lost or duplicated",
+    );
+    assert.deepStrictEqual(
       ctx.vectorSearch.size,
       4,
       "out-of-scope vectors survive, in-scope ones are replaced",
@@ -84,7 +93,7 @@ async function scopedCase(
   }
 }
 
-Deno.test("d1 reindex - include keeps out-of-scope chunk rows and refreshes in-scope", async () => {
+test("d1 reindex - include keeps out-of-scope chunk rows and refreshes in-scope", async () => {
   await scopedCase(
     { include: { graphs: [gA.value] } },
     ["graph", gA.value],
@@ -92,7 +101,7 @@ Deno.test("d1 reindex - include keeps out-of-scope chunk rows and refreshes in-s
   );
 });
 
-Deno.test("d1 reindex - exclude keeps excluded chunk rows and refreshes the rest", async () => {
+test("d1 reindex - exclude keeps excluded chunk rows and refreshes the rest", async () => {
   await scopedCase(
     { exclude: { predicates: [pY.value] } },
     ["predicate", pX.value],
@@ -100,7 +109,7 @@ Deno.test("d1 reindex - exclude keeps excluded chunk rows and refreshes the rest
   );
 });
 
-Deno.test("d1 reindex - a request with no criteria is unscoped and rebuilds everything", async () => {
+test("d1 reindex - a request with no criteria is unscoped and rebuilds everything", async () => {
   const ctx = await fixture();
   try {
     await tamper(ctx, "graph", gA.value);
@@ -109,16 +118,16 @@ Deno.test("d1 reindex - a request with no criteria is unscoped and rebuilds ever
       include: {},
       exclude: { graphs: [] },
     });
-    assertEquals(report.processedQuadCount, 4);
-    assertEquals(report.chunkRowCount, 4);
-    assertEquals(await count(ctx, "value = 'stale'"), 0);
-    assertEquals(await count(ctx), 4);
+    assert.deepStrictEqual(report.processedQuadCount, 4);
+    assert.deepStrictEqual(report.chunkRowCount, 4);
+    assert.deepStrictEqual(await count(ctx, "value = 'stale'"), 0);
+    assert.deepStrictEqual(await count(ctx), 4);
   } finally {
     await ctx.dispose();
   }
 });
 
-Deno.test("d1 reindex - unscoped reindex drops the stale chunk row of a deleted quad", async () => {
+test("d1 reindex - unscoped reindex drops the stale chunk row of a deleted quad", async () => {
   const ctx = await fixture();
   try {
     await ctx.connection.execute({
@@ -126,12 +135,12 @@ Deno.test("d1 reindex - unscoped reindex drops the stale chunk row of a deleted 
         "INSERT INTO chunks (quad_id, subject, predicate, graph, value, fts_value) VALUES ('gone', 's', 'p', 'g', 'ghost', 'ghost')",
       args: [],
     });
-    assertEquals(await count(ctx), 5);
+    assert.deepStrictEqual(await count(ctx), 5);
     const report = await ctx.searchIndex.reindex();
-    assertEquals(report.processedQuadCount, 4);
-    assertEquals(report.chunkRowCount, 4);
-    assertEquals(await count(ctx), 4);
-    assertEquals(await count(ctx, "quad_id = 'gone'"), 0);
+    assert.deepStrictEqual(report.processedQuadCount, 4);
+    assert.deepStrictEqual(report.chunkRowCount, 4);
+    assert.deepStrictEqual(await count(ctx), 4);
+    assert.deepStrictEqual(await count(ctx, "quad_id = 'gone'"), 0);
   } finally {
     await ctx.dispose();
   }
