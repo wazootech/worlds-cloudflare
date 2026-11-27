@@ -5,6 +5,7 @@ import type {
   VectorSearchIndex,
   VectorSearchQueryOptions,
 } from "./vector-search-index.ts";
+import { physicalVectorId } from "./physical-vector-id.ts";
 import { VECTORIZE_FILTERABLE_PROPERTY } from "./vectorize-provisioning.ts";
 
 /** RESULT_ID_KEY is the metadata key carrying the contract search-result id. */
@@ -88,7 +89,7 @@ export class VectorizeVectorSearchIndex implements VectorSearchIndex {
         );
       }
       vectors.push({
-        id: await this.physicalId(entry.id),
+        id: await physicalVectorId(this.worldId, entry.id),
         values: Array.from(entry.vector),
         metadata: {
           ...entry.metadata,
@@ -103,7 +104,7 @@ export class VectorizeVectorSearchIndex implements VectorSearchIndex {
   public async deleteByIds(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await this.options.index.deleteByIds(
-      await Promise.all(ids.map((id) => this.physicalId(id))),
+      await Promise.all(ids.map((id) => physicalVectorId(this.worldId, id))),
     );
   }
 
@@ -124,28 +125,6 @@ export class VectorizeVectorSearchIndex implements VectorSearchIndex {
       filter: { [WORLD_ID_KEY]: this.worldId },
     });
   }
-
-  /**
-   * physicalId namespaces a contract search-result id by world. Vectorize
-   * caps ids at 64 bytes, so the pair is hashed (SHA-256, base64url: 45
-   * characters with the prefix) instead of concatenated.
-   */
-  private async physicalId(resultId: string): Promise<string> {
-    const digest = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(`${this.worldId}\u0000${resultId}`),
-    );
-    return `v.${base64Url(new Uint8Array(digest))}`;
-  }
-}
-
-function base64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
 }
 
 function metadataToRecord(
